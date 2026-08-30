@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3a3a3a"/>
+      <stop offset="100%" stop-color="#161616"/>
+    </linearGradient>
+    <linearGradient id="apertureGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4fc3f7"/>
+      <stop offset="100%" stop-color="#2f8fce"/>
+    </linearGradient>
+    <linearGradient id="brushGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffd166"/>
+      <stop offset="100%" stop-color="#f4a261"/>
+    </linearGradient>
+  </defs>
+
+  <!-- rounded app-icon background -->
+  <rect x="8" y="8" width="240" height="240" rx="48" fill="url(#bgGrad)"/>
+  <rect x="8" y="8" width="240" height="240" rx="48" fill="none" stroke="#000" stroke-opacity="0.25" stroke-width="2"/>
+
+  <!-- aperture / lens blades, referencing the "photo" half of the editor -->
+  <g transform="translate(128,132)">
+    <circle r="62" fill="none" stroke="url(#apertureGrad)" stroke-width="10" opacity="0.25"/>
+    <g fill="url(#apertureGrad)">
+      <path d="M0,-52 L15,-30 A58,58 0 0 0 -15,-30 Z" opacity="0.95"/>
+      <path d="M45,-26 L46,4 A58,58 0 0 0 20,-38 Z" opacity="0.85" transform="rotate(72)"/>
+      <path d="M45,-26 L46,4 A58,58 0 0 0 20,-38 Z" opacity="0.85" transform="rotate(144)"/>
+      <path d="M45,-26 L46,4 A58,58 0 0 0 20,-38 Z" opacity="0.85" transform="rotate(216)"/>
+      <path d="M45,-26 L46,4 A58,58 0 0 0 20,-38 Z" opacity="0.85" transform="rotate(288)"/>
+    </g>
+    <circle r="20" fill="#101010"/>
+    <circle r="20" fill="none" stroke="#4fc3f7" stroke-width="3" opacity="0.6"/>
+  </g>
+
+  <!-- paintbrush stroke crossing the lens, referencing the "editor" half -->
+  <g transform="translate(0,0)">
+    <path d="M52,196 C78,178 96,150 108,118 C112,108 126,110 122,121
+             C110,155 90,182 66,204 C58,211 44,204 52,196 Z"
+          fill="url(#brushGrad)" stroke="#8a5a2b" stroke-width="2"/>
+    <path d="M118,110 L150,60 C154,54 163,58 161,65 L138,120 Z"
+          fill="#6b4226" stroke="#432b18" stroke-width="1.5"/>
+    <ellipse cx="152" cy="58" rx="9" ry="6" fill="#9b6a3a" transform="rotate(-35 152 58)"/>
+  </g>
+
+  <!-- "Py" wordmark badge -->
+  <g transform="translate(128,222)">
+    <text x="0" y="0" text-anchor="middle" font-family="'Segoe UI', Helvetica, Arial, sans-serif"
+          font-size="30" font-weight="700" fill="#f2f2f2" letter-spacing="1">PyEditor</text>
+  </g>
+</svg>
