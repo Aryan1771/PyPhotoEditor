@@ -1,83 +1,141 @@
-"""
-Document
-========
-Holds the state of a single open image: the current pixels, the original
-(for "reset"), and the undo/redo history. This class knows nothing about
-Tkinter, dialogs or drawing tools -- it is a plain state container that the
-UI drives. That separation is what lets `core` be tested/reused without a
-GUI at all.
-"""
-
-from __future__ import annotations
-from typing import Callable, Optional
+"""Display-independent document and memory-budgeted command history."""
+from dataclasses import dataclass
+import numpy as np
 from PIL import Image
 
-MAX_HISTORY = 30
+
+@dataclass
+class PatchCommand:
+    bbox: tuple
+    before: np.ndarray
+    after: np.ndarray
+    name: str = 'Brush stroke'
+
+    @property
+    def nbytes(self):
+        return self.before.nbytes + self.after.nbytes
+
+    def undo(self, document):
+        document.image.paste(Image.fromarray(self.before), self.bbox[:2])
+
+    def redo(self, document):
+        document.image.paste(Image.fromarray(self.after), self.bbox[:2])
+
+
+@dataclass
+class SnapshotCommand:
+    before: Image.Image
+    after: Image.Image
+    name: str = 'Image operation'
+
+    @property
+    def nbytes(self):
+        return (self.before.width*self.before.height + self.after.width*self.after.height)*4
+
+    def undo(self, document):
+        document.image = self.before.copy()
+        document.selection = None
+
+    def redo(self, document):
+        document.image = self.after.copy()
+        document.selection = None
 
 
 class Document:
-    def __init__(self, image: Optional[Image.Image] = None):
-        self.filepath: Optional[str] = None
-        self.image: Optional[Image.Image] = image
-        self.original: Optional[Image.Image] = image.copy() if image else None
-        self._undo: list[Image.Image] = []
-        self._redo: list[Image.Image] = []
+    def __init__(self, image=None, memory_budget=512*1024*1024):
+        self.filepath = None
+        self.image = None
+        self.original = None
+        self.selection = None
+        self.memory_budget = max(0, int(memory_budget))
+        self.history = []
+        self.history_index = 0
+        self.revision = 0
+        self._pending = None
+        if image is not None:
+            self.load(image)
 
-    # ---- lifecycle -------------------------------------------------
-    def load(self, image: Image.Image, filepath: Optional[str] = None) -> None:
-        self.image = image.convert("RGBA")
+    def load(self, image, filepath=None):
+        self.image = image.convert('RGBA')
         self.original = self.image.copy()
         self.filepath = filepath
-        self._undo.clear()
-        self._redo.clear()
+        self.selection = None
+        self.history.clear()
+        self.history_index = 0
+        self._pending = None
+        self.revision += 1
 
-    def new(self, width: int, height: int, color="white") -> None:
-        self.load(Image.new("RGBA", (max(1, width), max(1, height)), color))
-        self.filepath = None
-
-    # ---- undo / redo -------------------------------------------------
-    def push_undo(self) -> None:
-        if self.image is None:
-            return
-        self._undo.append(self.image.copy())
-        if len(self._undo) > MAX_HISTORY:
-            self._undo.pop(0)
-        self._redo.clear()
-
-    def undo(self) -> bool:
-        if not self._undo:
-            return False
-        self._redo.append(self.image.copy())
-        self.image = self._undo.pop()
-        return True
-
-    def redo(self) -> bool:
-        if not self._redo:
-            return False
-        self._undo.append(self.image.copy())
-        self.image = self._redo.pop()
-        return True
-
-    def reset_to_original(self) -> None:
-        if self.original is None:
-            return
-        self.push_undo()
-        self.image = self.original.copy()
-
-    # ---- applying a transform with automatic undo tracking ----------
-    def apply(self, transform: Callable[[Image.Image], Image.Image]) -> None:
-        """Run a pure `Image -> Image` function and record undo history.
-
-        Every filter/operation in `image_ops`, `filters`, `dithering` and
-        `segmentation` matches this `Image -> Image` signature, so the UI
-        never needs a special case per-effect -- it just calls
-        `document.apply(image_ops.grayscale)`.
-        """
-        if self.image is None:
-            return
-        self.push_undo()
-        self.image = transform(self.image)
+    def new(self, width, height, color='white'):
+        self.load(Image.new('RGBA',(max(1,width),max(1,height)),color))
 
     @property
     def size(self):
-        return self.image.size if self.image else (0, 0)
+        return self.image.size if self.image is not None else (0,0)
+
+    @property
+    def history_bytes(self):
+        return sum(c.nbytes for c in self.history)
+
+    @property
+    def can_restore(self):
+        return self.original is not None and self.size == self.original.size
+
+    def record(self, command):
+        del self.history[self.history_index:]
+        self.history.append(command)
+        self.history_index = len(self.history)
+        while self.history and self.history_bytes > self.memory_budget:
+            self.history.pop(0)
+            self.history_index -= 1
+        self.revision += 1
+
+    def push_undo(self):
+        """Compatibility for older tools; finalized before the next history action."""
+        self.finish_pending()
+        if self.image is not None:
+            self._pending = self.image.copy()
+
+    def finish_pending(self):
+        if self._pending is not None:
+            before, self._pending = self._pending, None
+            self.record(SnapshotCommand(before,self.image.copy()))
+
+    def undo(self):
+        self.finish_pending()
+        if not self.history_index:
+            return False
+        self.history_index -= 1
+        self.history[self.history_index].undo(self)
+        self.revision += 1
+        return True
+
+    def redo(self):
+        self.finish_pending()
+        if self.history_index == len(self.history):
+            return False
+        self.history[self.history_index].redo(self)
+        self.history_index += 1
+        self.revision += 1
+        return True
+
+    def jump_to(self, index):
+        index = max(0,min(len(self.history),int(index)))
+        while self.history_index > index:
+            self.undo()
+        while self.history_index < index:
+            self.redo()
+
+    def apply(self, transform, name=None):
+        if self.image is None:
+            return
+        self.finish_pending()
+        before = self.image.copy()
+        after = transform(before.copy()).convert('RGBA')
+        self.image = after
+        if before.size != after.size:
+            self.selection = None
+        self.record(SnapshotCommand(before,after.copy(),name or getattr(transform,'__name__','Image operation').replace('_',' ').title()))
+
+    def reset_to_original(self):
+        if self.original is not None:
+            self.apply(lambda _:self.original.copy(),'Reset to original')

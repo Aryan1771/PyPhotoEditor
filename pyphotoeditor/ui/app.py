@@ -38,6 +38,8 @@ class App:
 
         self._build_layout()
         self._bind_shortcuts()
+        self.history_list.bind("<<ListboxSelect>>", self._history_jump)
+        self.refresh_history()
 
     # ---- layout construction -----------------------------------------
     def _build_layout(self):
@@ -83,6 +85,20 @@ class App:
         for key, button in self.tool_buttons.items():
             button.set_selected(key == name)
 
+    def refresh_history(self):
+        self.document.finish_pending()
+        self.history_list.delete(0, "end")
+        self.history_list.insert("end", "Initial / retained state")
+        for command in self.document.history:
+            self.history_list.insert("end", command.name)
+        self.history_list.selection_set(self.document.history_index)
+
+    def _history_jump(self, event):
+        selected = self.history_list.curselection()
+        if selected:
+            self.document.jump_to(selected[0])
+            self.canvas_view.render()
+
     def toggle_panel(self):
         if self.right_panel.winfo_manager():
             self.right_panel.pack_forget()
@@ -101,6 +117,7 @@ class App:
 
     def _create_new_document(self, width, height):
         self.document.new(width, height)
+        self.refresh_history()
         self.canvas_view.render()
         self.status("New document created.")
 
@@ -112,6 +129,7 @@ class App:
             return
         try:
             self.document.load(Image.open(path), filepath=path)
+            self.refresh_history()
             self.canvas_view.fit_to_window()
             self.status(f"Opened {os.path.basename(path)}")
         except Exception as exc:
@@ -144,14 +162,17 @@ class App:
 
     def undo(self):
         if self.document.undo():
+            self.refresh_history()
             self.canvas_view.render()
 
     def redo(self):
         if self.document.redo():
+            self.refresh_history()
             self.canvas_view.render()
 
     def reset(self):
         self.document.reset_to_original()
+        self.refresh_history()
         self.canvas_view.render()
 
     def fit_to_window(self):
@@ -216,4 +237,5 @@ class App:
         if self.document.image is None:
             return
         self.document.apply(transform)
+        self.refresh_history()
         self.canvas_view.render()
