@@ -9,10 +9,12 @@ scikit-image filters.
 """
 
 from __future__ import annotations
+from .alpha import preserve_alpha
 import numpy as np
 from PIL import Image
 
 
+@preserve_alpha
 def floyd_steinberg(img: Image.Image) -> Image.Image:
     gray = np.asarray(img.convert("L"), dtype=np.float32) / 255.0
     work = gray.copy()

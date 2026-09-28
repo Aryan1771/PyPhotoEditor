@@ -8,11 +8,13 @@ so `Document.apply()` (see document.py) can call any of them uniformly.
 """
 
 from __future__ import annotations
+from .alpha import preserve_alpha
 import numpy as np
 from PIL import Image, ImageOps
 from skimage import color
 
 
+@preserve_alpha
 def grayscale(img: Image.Image) -> Image.Image:
     arr = np.asarray(img.convert("RGB"))
     gray = color.rgb2gray(arr)
@@ -20,10 +22,12 @@ def grayscale(img: Image.Image) -> Image.Image:
     return Image.fromarray(out, "L").convert("RGBA")
 
 
+@preserve_alpha
 def invert(img: Image.Image) -> Image.Image:
     return ImageOps.invert(img.convert("RGB")).convert("RGBA")
 
 
+@preserve_alpha
 def auto_contrast(img: Image.Image) -> Image.Image:
     return ImageOps.autocontrast(img.convert("RGB")).convert("RGBA")
 

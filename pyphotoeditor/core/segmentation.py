@@ -9,6 +9,7 @@ so it gets its own module (functional cohesion).
 """
 
 from __future__ import annotations
+from .alpha import preserve_alpha
 import numpy as np
 from PIL import Image
 from scipy import ndimage
@@ -16,6 +17,7 @@ from skimage import color, filters as skfilters, morphology
 from sklearn.cluster import KMeans
 
 
+@preserve_alpha
 def kmeans_posterize(img: Image.Image, n_clusters: int = 8, sample_cap: int = 50_000) -> Image.Image:
     """Reduce the image to `n_clusters` dominant colors via K-Means."""
     arr = np.asarray(img.convert("RGB"), dtype=np.float32) / 255.0
@@ -28,7 +30,7 @@ def kmeans_posterize(img: Image.Image, n_clusters: int = 8, sample_cap: int = 50
     else:
         fit_sample = pixels
 
-    km = KMeans(n_clusters=n_clusters, n_init=3, random_state=0)
+    km = KMeans(n_clusters=min(n_clusters,len(fit_sample)), n_init=3, random_state=0)
     km.fit(fit_sample)
     labels = km.predict(pixels)
     out = km.cluster_centers_[labels].reshape(h, w, 3)

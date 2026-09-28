@@ -1,169 +1,104 @@
-"""
-tools
-=====
-Each drawing tool is a small class implementing the same interface:
-
-    on_down(app, point)
-    on_move(app, point)
-    on_up(app, point)
-
-`point` is an (x, y) pixel coordinate already mapped into image space by
-CanvasView. Tools mutate `app.document.image` directly via Pillow's
-ImageDraw and call `app.document.push_undo()` themselves at the start of a
-stroke/shape, so `CanvasView` doesn't need to know anything about *how*
-any particular tool works -- it just forwards events to `app.active_tool`.
-This keeps adding a new tool to a single new class + one registry entry.
-"""
-
-from __future__ import annotations
-from PIL import ImageDraw, Image
-import numpy as np
+"""Pointer tools delegate all pixel operations to the headless core."""
+from ..core.brush import Brush
+from ..core.stroke import StrokeSession
+from ..core.brush_effects import EFFECTS
+from ..core import drawing, image_ops
 
 
 class BaseTool:
-    name = "base"
-
-    def on_down(self, app, point):
-        pass
-
-    def on_move(self, app, point):
-        pass
-
-    def on_up(self, app, point):
-        pass
+    name = 'base'
+    def on_down(self,app,point):
+        return None
+    def on_move(self,app,point):
+        return None
+    def on_up(self,app,point):
+        return None
 
 
-class _FreehandTool(BaseTool):
-    """Shared behavior for brush/pencil/eraser (all are 'drag to paint')."""
+class BrushTool(BaseTool):
+    name = 'brush'
+    engine_key = 'paint'
+    session = None
 
-    def __init__(self):
-        self._last = None
-
-    def on_down(self, app, point):
-        doc = app.document
-        if doc.image is None:
+    def on_down(self,app,point):
+        if app.document.image is None:
             return
-        doc.push_undo()
-        self._last = point
-        self._paint(app, point, point)
-
-    def on_move(self, app, point):
-        if self._last is None:
+        if self.session:
+            self.session.finish()
+        brush = Brush(app.brush_shape,app.brush_size,app.brush_hardness,app.brush_strength)
+        key = getattr(self,'effect_key',self.engine_key)
+        if key == 'restore' and not app.document.can_restore:
+            app.status('Restore unavailable: canvas dimensions differ from the original.')
             return
-        self._paint(app, self._last, point)
-        self._last = point
+        params = dict(app.effect_params.get(key,{}),color=app.brush_color)
+        self.session = StrokeSession(app.document,EFFECTS[key],brush,app.stroke_mode,params)
+        app.canvas_view.render_dirty(self.session.move_to(point))
 
-    def on_up(self, app, point):
-        self._last = None
+    def on_move(self,app,point):
+        if self.session:
+            app.canvas_view.render_dirty(self.session.move_to(point))
 
-    def _paint(self, app, p1, p2):
-        raise NotImplementedError
-
-
-class BrushTool(_FreehandTool):
-    name = "brush"
-
-    def _paint(self, app, p1, p2):
-        img = app.document.image
-        draw = ImageDraw.Draw(img)
-        width = app.brush_size
-        draw.line([p1, p2], fill=app.brush_color, width=width)
-        r = width // 2
-        draw.ellipse((p2[0] - r, p2[1] - r, p2[0] + r, p2[1] + r), fill=app.brush_color)
+    def on_up(self,app,point):
+        if self.session:
+            if point is not None and point != self.session.last:
+                self.session.move_to(point)
+            self.session.finish()
+            self.session = None
 
 
-class PencilTool(_FreehandTool):
-    name = "pencil"
-
-    def _paint(self, app, p1, p2):
-        draw = ImageDraw.Draw(app.document.image)
-        draw.line([p1, p2], fill=app.brush_color, width=2)
+class PencilTool(BrushTool):
+    name = 'pencil'
 
 
-class EraserTool(_FreehandTool):
-    name = "eraser"
-
-    def _paint(self, app, p1, p2):
-        img = app.document.image
-        width = app.brush_size
-        mask = Image.new("L", img.size, 0)
-        ImageDraw.Draw(mask).line([p1, p2], fill=255, width=width)
-        alpha = np.asarray(img.getchannel("A"))
-        new_alpha = np.where(np.asarray(mask) > 0, 0, alpha).astype(np.uint8)
-        img.putalpha(Image.fromarray(new_alpha))
+class EraserTool(BrushTool):
+    name = 'eraser'
+    engine_key = 'erase'
 
 
-class _ShapeTool(BaseTool):
-    """Shared behavior for rectangle/ellipse: drag out a bounding box."""
-
-    def __init__(self):
-        self.box = None
-
-    def on_down(self, app, point):
-        self.box = [point[0], point[1], point[0], point[1]]
-
-    def on_move(self, app, point):
+class ShapeTool(BaseTool):
+    box = None
+    def on_down(self,app,point):
+        self.box = [*point,*point]
+    def on_move(self,app,point):
         if self.box:
-            self.box[2:] = [point[0], point[1]]
+            self.box[2:] = point
             app.canvas_view.draw_marquee(self.box)
-
-    def on_up(self, app, point):
-        if not self.box:
+    def on_up(self,app,point):
+        if self.box is None:
             return
-        x1, y1, x2, y2 = self._normalized()
-        if x2 > x1 and y2 > y1:
-            app.document.push_undo()
-            self._commit(app, (x1, y1, x2, y2))
+        if point:
+            self.box[2:] = point
+        x1,y1,x2,y2 = self.box
+        box = (min(x1,x2),min(y1,y2),max(x1,x2),max(y1,y2))
         self.box = None
-
-    def _normalized(self):
-        x1, y1, x2, y2 = self.box
-        return min(x1, x2), min(y1, y2), max(x1, x2), max(y1, y2)
-
-    def _commit(self, app, box):
-        raise NotImplementedError
-
-
-class RectangleTool(_ShapeTool):
-    name = "rect"
-
-    def _commit(self, app, box):
-        draw = ImageDraw.Draw(app.document.image)
-        draw.rectangle(box, outline=app.brush_color, width=max(1, app.brush_size // 4))
+        if box[2] <= box[0] or box[3] <= box[1]:
+            return
+        if self.name == 'crop':
+            app.document.apply(lambda image:image_ops.crop(image,box),'Crop')
+        else:
+            app.document.apply(lambda image:drawing.shape(image,box,self.kind,app.brush_color,max(1,app.brush_size//4)),self.kind.title())
 
 
-class EllipseTool(_ShapeTool):
-    name = "ellipse"
-
-    def _commit(self, app, box):
-        draw = ImageDraw.Draw(app.document.image)
-        draw.ellipse(box, outline=app.brush_color, width=max(1, app.brush_size // 4))
+class RectangleTool(ShapeTool):
+    name,kind = 'rect','rectangle'
 
 
-class CropTool(_ShapeTool):
-    name = "crop"
+class EllipseTool(ShapeTool):
+    name,kind = 'ellipse','ellipse'
 
-    def _commit(self, app, box):
-        app.document.image = app.document.image.crop(box)
+
+class CropTool(ShapeTool):
+    name = 'crop'
 
 
 class EyedropperTool(BaseTool):
-    name = "eyedropper"
-
-    def on_down(self, app, point):
-        if app.document.image is None:
-            return
-        app.set_brush_color(app.document.image.getpixel(point))
+    name = 'eyedropper'
+    def on_down(self,app,point):
+        if app.document.image is not None:
+            app.set_brush_color(app.document.image.getpixel(point))
 
 
-# Registry: single source of truth for "which tools exist" used by both
-# the toolbar (to build buttons) and App (to instantiate/select tools).
-TOOL_CLASSES = {
-    "brush": BrushTool,
-    "pencil": PencilTool,
-    "eraser": EraserTool,
-    "rect": RectangleTool,
-    "ellipse": EllipseTool,
-    "crop": CropTool,
-    "eyedropper": EyedropperTool,
-}
+TOOL_CLASSES = {cls.name:cls for cls in (BrushTool,PencilTool,EraserTool,RectangleTool,EllipseTool,CropTool,EyedropperTool)}
+for key,effect in EFFECTS.items():
+    if key not in ('paint','erase'):
+        TOOL_CLASSES[key] = type(key.title()+'Tool',(BrushTool,),{'name':key,'effect_key':key,'label':effect.name})

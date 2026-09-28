@@ -19,6 +19,8 @@ from . import menu_bar, toolbar, tool_strip, tool_panel, dialogs
 from . import theme as T
 from .canvas_view import CanvasView
 from .tools import TOOL_CLASSES
+from .tool_options import build_options
+from .worker import OperationRunner
 
 
 class App:
@@ -31,12 +33,20 @@ class App:
         self.root.configure(bg=T.BG_APP)
 
         self.document = Document()
+        self.busy = False
+        self.runner = OperationRunner(self)
+        self.brush_shape = "circle"
+        self.brush_strength = 100
+        self.brush_hardness = 100
+        self.stroke_mode = "Once per stroke"
+        self.effect_params = {}
         self.brush_size = T.DEFAULT_BRUSH
         self.brush_color = T.DEFAULT_COLOR
         self.tools = {name: cls() for name, cls in TOOL_CLASSES.items()}
         self.active_tool = self.tools["brush"]
 
         self._build_layout()
+        build_options(self)
         self._bind_shortcuts()
         self.history_list.bind("<<ListboxSelect>>", self._history_jump)
         self.refresh_history()
@@ -70,6 +80,8 @@ class App:
         self.root.bind("<Control-n>", lambda e: self.new_image())
         self.root.bind("<Control-z>", lambda e: self.undo())
         self.root.bind("<Control-y>", lambda e: self.redo())
+        self.root.bind("<bracketleft>", lambda e: self.adjust_size(-5))
+        self.root.bind("<bracketright>", lambda e: self.adjust_size(5))
 
     # ---- small shared UI callbacks -----------------------------------
     def status(self, text: str):
@@ -79,7 +91,9 @@ class App:
         self.zoom_label.config(text=f"{int(scale_fraction * 100)}%")
 
     def select_tool(self, name: str):
+        self.active_tool.on_up(self, None)
         self.active_tool = self.tools[name]
+        build_options(self)
         self.tool_var.set(name.title())
         self.status(f"Tool: {name.title()}")
         for key, button in self.tool_buttons.items():
@@ -105,8 +119,15 @@ class App:
         else:
             self.right_panel.pack(side="right", fill="y")
 
+    def adjust_size(self, delta):
+        if self.root.focus_get() and self.root.focus_get().winfo_class() in ("Entry", "TEntry"):
+            return
+        self.set_brush_size(self.brush_size + delta)
+        if hasattr(self, "size_var"):
+            self.size_var.set(self.brush_size)
+
     def set_brush_size(self, value):
-        self.brush_size = max(1, int(float(value)))
+        self.brush_size = max(1, min(500, int(float(value))))
 
     def set_brush_color(self, rgba):
         self.brush_color = rgba
@@ -161,16 +182,19 @@ class App:
             self.save_image()
 
     def undo(self):
+        self.active_tool.on_up(self, None)
         if self.document.undo():
             self.refresh_history()
             self.canvas_view.render()
 
     def redo(self):
+        self.active_tool.on_up(self, None)
         if self.document.redo():
             self.refresh_history()
             self.canvas_view.render()
 
     def reset(self):
+        self.active_tool.on_up(self, None)
         self.document.reset_to_original()
         self.refresh_history()
         self.canvas_view.render()
@@ -236,6 +260,5 @@ class App:
     def _apply(self, transform):
         if self.document.image is None:
             return
-        self.document.apply(transform)
-        self.refresh_history()
-        self.canvas_view.render()
+        name = getattr(transform, "__name__", "Image operation").replace("_", " ").title()
+        self.runner.start(transform, name)

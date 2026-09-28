@@ -11,6 +11,7 @@ on the actual algorithm (functional cohesion).
 """
 
 from __future__ import annotations
+from .alpha import preserve_alpha
 import numpy as np
 from PIL import Image, ImageFilter
 from scipy import ndimage
@@ -27,24 +28,28 @@ def _from_rgb_array(arr: np.ndarray) -> Image.Image:
     return Image.fromarray(arr, "RGB").convert("RGBA")
 
 
+@preserve_alpha
 def gaussian_blur(img: Image.Image, sigma: float = 2.0) -> Image.Image:
     arr = _to_rgb_array(img)
     out = ndimage.gaussian_filter(arr, sigma=(sigma, sigma, 0))
     return _from_rgb_array(out)
 
 
+@preserve_alpha
 def median_filter(img: Image.Image, size: int = 3) -> Image.Image:
     arr = _to_rgb_array(img)
     out = ndimage.median_filter(arr, size=(size, size, 1))
     return _from_rgb_array(out)
 
 
+@preserve_alpha
 def unsharp_mask(img: Image.Image, radius: float = 2, percent: int = 160, threshold: int = 3) -> Image.Image:
     return img.convert("RGB").filter(
         ImageFilter.UnsharpMask(radius=radius, percent=percent, threshold=threshold)
     ).convert("RGBA")
 
 
+@preserve_alpha
 def sobel_edges(img: Image.Image) -> Image.Image:
     arr = _to_rgb_array(img)
     gray = color.rgb2gray(arr)
@@ -55,6 +60,7 @@ def sobel_edges(img: Image.Image) -> Image.Image:
     return _from_rgb_array(np.repeat(out[..., None], 3, axis=2))
 
 
+@preserve_alpha
 def canny_edges(img: Image.Image, sigma: float = 1.4) -> Image.Image:
     arr = _to_rgb_array(img)
     gray = color.rgb2gray(arr)
@@ -63,6 +69,7 @@ def canny_edges(img: Image.Image, sigma: float = 1.4) -> Image.Image:
     return _from_rgb_array(out)
 
 
+@preserve_alpha
 def clahe(img: Image.Image, clip_limit: float = 0.03) -> Image.Image:
     arr = _to_rgb_array(img) / 255.0
     lab = color.rgb2lab(arr)
@@ -72,6 +79,7 @@ def clahe(img: Image.Image, clip_limit: float = 0.03) -> Image.Image:
     return _from_rgb_array(out)
 
 
+@preserve_alpha
 def denoise_tv(img: Image.Image, weight: float = 0.08) -> Image.Image:
     arr = _to_rgb_array(img) / 255.0
     out = restoration.denoise_tv_chambolle(arr, weight=weight, channel_axis=-1)
