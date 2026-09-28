@@ -61,3 +61,44 @@ def test_budget_branching_and_failure_atomicity():
     except ZeroDivisionError:
         pass
     assert doc.image.tobytes() == before
+
+
+def test_build_up_differs_from_once_and_cancel_restores():
+    image = Image.new('RGBA',(40,40),(10,20,30,99))
+    doc = Document(image)
+    s = StrokeSession(doc,EFFECTS['negative'],Brush('square',10),'Build up')
+    s.publish(s.stamp((20,20))); s.publish(s.stamp((20,20)))
+    np.testing.assert_array_equal(np.asarray(doc.image),np.asarray(image))
+    s.cancel()
+    assert not doc.history
+    s = StrokeSession(doc,EFFECTS['negative'],Brush('square',10))
+    s.move_to((20,20))
+    s.cancel()
+    np.testing.assert_array_equal(np.asarray(doc.image),np.asarray(image))
+
+
+def test_clipped_stroke_and_soft_strength_use_stroke_start():
+    doc = Document(Image.new('RGBA',(25,25),(20,60,100,200)))
+    s = StrokeSession(doc,EFFECTS['negative'],Brush(size=20,hardness=30,strength=60))
+    for point in [(0,0),(5,0),(0,0)]:
+        s.move_to(point)
+    s.publish(s.stamp(s.last))
+    expected = s.base.astype(np.float32)
+    target = s.base.copy();target[...,:3] = 255-target[...,:3]
+    expected = np.rint(expected+(target.astype(np.float32)-expected)*s.coverage[...,None]).astype(np.uint8)
+    s.finish()
+    np.testing.assert_array_equal(np.asarray(doc.image),expected)
+
+
+def test_jump_across_resize_and_patch():
+    doc = Document(Image.new('RGBA',(40,40),'white'))
+    s = StrokeSession(doc,EFFECTS['negative'],Brush('square',10));s.move_to((10,10));s.finish()
+    painted = doc.image.tobytes()
+    doc.apply(lambda im:im.resize((20,20)),'Resize')
+    doc.jump_to(0)
+    assert doc.size == (40,40)
+    assert doc.image.getpixel((10,10)) == (255,255,255,255)
+    doc.jump_to(1)
+    assert doc.image.tobytes() == painted
+    doc.jump_to(2)
+    assert doc.size == (20,20)

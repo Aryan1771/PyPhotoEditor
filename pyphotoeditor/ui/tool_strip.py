@@ -17,6 +17,11 @@ def build_tool_strip(parent, app):
     content = tk.Frame(canvas,bg=T.BG_SIDEBAR)
     canvas.create_window(0,0,window=content,anchor='nw')
     content.bind('<Configure>',lambda e:canvas.configure(scrollregion=canvas.bbox('all')))
+    def scroll_tools(event):
+        canvas.yview_scroll(-1 if event.delta > 0 else 1,'units')
+        return 'break'
+    canvas.bind('<MouseWheel>',scroll_tools)
+    content.bind('<MouseWheel>',scroll_tools)
     app.tool_buttons = {}
     previous = None
     for name, tool in app.tools.items():
@@ -28,6 +33,7 @@ def build_tool_strip(parent, app):
         button = IconToggleButton(content,text=label,icon=name,command=lambda n=name:app.select_tool(n))
         button.pack(fill='x',padx=T.SMALL,pady=T.BORDER_WIDTH)
         button.set_selected(name == 'brush')
+        button.bind('<MouseWheel>',scroll_tools)
         Tooltip(button,label)
         app.tool_buttons[name] = button
     return strip

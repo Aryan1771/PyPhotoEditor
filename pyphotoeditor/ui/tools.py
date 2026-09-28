@@ -25,8 +25,18 @@ class BrushTool(BaseTool):
     engine_key = 'paint'
     session = None
 
+    def __init__(self):
+        self.next_strokes = deque()
+        self.queued_active = None
+
     def on_down(self,app,point):
-        if app.document.image is None or app.busy or app.drawing:
+        if app.document.image is None:
+            return
+        if app.drawing:
+            self.queued_active = {'points':[point], 'released':False}
+            self.next_strokes.append(self.queued_active)
+            return
+        if app.busy:
             return
         brush = Brush(app.brush_shape,app.brush_size,app.brush_hardness,app.brush_strength)
         key = getattr(self,'effect_key',self.engine_key)
@@ -53,16 +63,27 @@ class BrushTool(BaseTool):
             self._drain(app)
         def cancel():
             self.pending.clear()
+            self.next_strokes.clear()
+            self.queued_active = None
             self.session = None
             app.drawing = False
         app.runner.submit(work,'Prepare '+EFFECTS[key].name,ready,cancel,show_progress=key == 'background_eraser')
 
     def on_move(self,app,point):
+        if self.queued_active is not None:
+            if point is not None:
+                self.queued_active['points'].append(point)
+            return
         if app.drawing and not self.released and point is not None:
             if not self.pending or self.pending[-1] != point:
                 self.pending.append(point)
 
     def on_up(self,app,point):
+        if self.queued_active is not None:
+            self.on_move(app,point)
+            self.queued_active['released'] = True
+            self.queued_active = None
+            return
         if app.drawing:
             self.on_move(app,point)
             self.released = True
@@ -91,12 +112,21 @@ class BrushTool(BaseTool):
                 self.session = None
                 app.drawing = False
                 app.refresh_history()
+                if self.next_strokes:
+                    queued = self.next_strokes.popleft()
+                    if self.queued_active is queued:
+                        self.queued_active = None
+                    self.on_down(app,queued['points'][0])
+                    self.pending.extend(queued['points'][1:])
+                    self.released = queued['released']
             else:
                 app.root.after(1,lambda:self._drain(app))
         except Exception as exc:
             self.session.cancel()
             self.session = None
             app.drawing = False
+            self.next_strokes.clear()
+            self.queued_active = None
             app.canvas_view.render()
             messagebox.showerror('Brush failed',str(exc),parent=app.root)
 

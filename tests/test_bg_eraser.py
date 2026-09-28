@@ -66,3 +66,25 @@ def test_exports(tmp_path):
     path = tmp_path/'test.jpg'
     save_image(image,path)
     assert Image.open(path).getpixel((0,0)) == (255,255,255)
+
+
+def test_eraser_crossing_is_idempotent_and_one_command():
+    image = Image.new('RGBA',(30,30),(235,235,235,200))
+    single = Document(image)
+    crossing = Document(image)
+    erase(single,[(5,15),(25,15)],limits='Discontiguous',tolerance=20,softness=20,defringe=True)
+    erase(crossing,[(5,15),(25,15),(5,15),(25,15)],limits='Discontiguous',tolerance=20,softness=20,defringe=True)
+    assert crossing.image.tobytes() == single.image.tobytes()
+    assert len(crossing.history) == 1
+    crossing.undo()
+    assert crossing.image.tobytes() == image.tobytes()
+
+
+def test_continuous_sampling_tracks_stroke_start_colors():
+    a = np.full((20,40,4),255,np.uint8)
+    a[:,:20,:3] = (80,100,120)
+    a[:,20:,:3] = (180,50,90)
+    doc = Document(Image.fromarray(a))
+    erase(doc,[(4,10),(35,10)],sampling='Continuous',limits='Discontiguous',tolerance=1,softness=0)
+    assert doc.image.getpixel((4,10))[3] == 0
+    assert doc.image.getpixel((35,10))[3] == 0

@@ -157,7 +157,9 @@ class Tooltip:
         self.popup = tk.Toplevel(self.widget)
         self.popup.overrideredirect(True)
         self.popup.geometry(f'+{self.widget.winfo_rootx()}+{self.widget.winfo_rooty()+T.BUTTON_HEIGHT}')
-        tk.Label(self.popup,text=self.text,bg=T.BG_SURFACE,fg=T.TEXT,padx=T.PAD,pady=T.GAP).pack()
+        from tkinter import font
+        width = font.Font(font=T.FONT).measure(self.text)+2*T.PAD
+        RoundedButton(self.popup,text=self.text,width=width).pack()
 
     def hide(self, event=None):
         if self.popup:
@@ -168,8 +170,18 @@ class Tooltip:
 class Panel(tk.Frame):
     def __init__(self, parent, title='', **kwargs):
         super().__init__(parent,bg=T.BG_SIDEBAR,highlightbackground=T.BORDER,highlightthickness=T.BORDER_WIDTH,**kwargs)
+        self.surface = tk.Canvas(self,bg=T.BG_SIDEBAR,highlightthickness=0)
+        self.surface.place(x=0,y=0,relwidth=1,relheight=1)
+        self.tk.call('lower',self.surface._w)
+        self.surface.bind('<Configure>',self._draw_surface)
         if title:
             tk.Label(self,text=title,bg=T.BG_SIDEBAR,fg=T.TEXT_MUTED,font=T.FONT_HEADING).pack(anchor='w',padx=T.PAD,pady=T.GAP)
+
+
+    def _draw_surface(self,event):
+        w,h,r = event.width,event.height,T.RADIUS
+        self.surface.delete('all')
+        self.surface.create_polygon(r,1,w-r,1,w-1,1,w-1,r,w-1,h-r,w-1,h-1,w-r,h-1,r,h-1,1,h-1,1,h-r,1,r,1,1,smooth=True,fill=T.BG_SIDEBAR,outline=T.BORDER,width=T.BORDER_WIDTH)
 
 
 Card = Panel

@@ -140,7 +140,7 @@ class CanvasView:
     def _on_down(self,event):
         if self._space:
             return self._pan_start(event)
-        if getattr(self.app,'busy',False):
+        if getattr(self.app,'busy',False) and not getattr(self.app,'drawing',False):
             return
         p = self.to_image_point(event.x,event.y)
         if p:
