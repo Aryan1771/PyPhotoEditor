@@ -25,7 +25,7 @@ def _to_rgb_array(img: Image.Image) -> np.ndarray:
 def _from_rgb_array(arr: np.ndarray) -> Image.Image:
     if arr.dtype != np.uint8:
         arr = np.clip(arr * 255 if arr.max() <= 1.0 else arr, 0, 255).astype(np.uint8)
-    return Image.fromarray(arr, "RGB").convert("RGBA")
+    return Image.fromarray(arr).convert("RGBA")
 
 
 @preserve_alpha

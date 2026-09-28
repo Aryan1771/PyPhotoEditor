@@ -34,7 +34,7 @@ def kmeans_posterize(img: Image.Image, n_clusters: int = 8, sample_cap: int = 50
     km.fit(fit_sample)
     labels = km.predict(pixels)
     out = km.cluster_centers_[labels].reshape(h, w, 3)
-    return Image.fromarray(np.clip(out * 255, 0, 255).astype(np.uint8), "RGB").convert("RGBA")
+    return Image.fromarray(np.clip(out * 255, 0, 255).astype(np.uint8)).convert("RGBA")
 
 
 def rotoscope(img: Image.Image) -> Image.Image:
@@ -68,4 +68,4 @@ def rotoscope(img: Image.Image) -> Image.Image:
     alpha = ndimage.gaussian_filter(candidate.astype(np.float32), sigma=2)
     alpha = np.clip(alpha, 0, 1)
     rgba = np.dstack([rgb, (alpha * 255).astype(np.uint8)])
-    return Image.fromarray(rgba, "RGBA")
+    return Image.fromarray(rgba)

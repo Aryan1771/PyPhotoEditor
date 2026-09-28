@@ -18,6 +18,8 @@ def build_options(app):
     row.pack(fill='x',padx=T.GAP,pady=T.SMALL)
     shape = tk.StringVar(value=app.brush_shape)
     SegmentedControl(row,('circle','square'),shape,lambda v:setattr(app,'brush_shape',v)).pack(side='left')
+    row = tk.Frame(app.options)
+    row.pack(fill='x',padx=T.GAP,pady=T.SMALL)
     for label,attr,low,high in [('Size','brush_size',1,500),('Strength','brush_strength',1,100),('Hardness','brush_hardness',0,100)]:
         var = tk.DoubleVar(value=getattr(app,attr))
         app.option_vars.append(var)
@@ -38,7 +40,7 @@ def build_options(app):
     app.option_vars.extend((shape,mode))
     # Parameter controls wrap onto rows so even the eraser fits the minimum window.
     for index,(name,spec) in enumerate(effect.params.items()):
-        if index % 3 == 0:
+        if index % T.PARAMS_PER_ROW == 0:
             row2 = tk.Frame(app.options)
             row2.pack(fill='x',padx=T.PAD,pady=T.SMALL)
         if 'choices' in spec:

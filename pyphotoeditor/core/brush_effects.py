@@ -188,3 +188,14 @@ EFFECTS.update({
     'sponge':Effect('Sponge',rgb_effect(sponge),params={'operation':choice('saturate','saturate','desaturate'),'amount':number(50,1,100)}),
     'cartoon':Effect('Cartoon',rgb_effect(cartoon),pad=1,params={'levels':number(5,2,16),'edges':number(5,1,12)}),
 })
+
+from .bg_eraser import erase_background, restore
+EFFECTS.update({
+    'background_eraser':Effect('Background Eraser',erase_background,alpha_effect=True,context=True,params={
+        'tolerance':number(25,0,100),'softness':number(10,0,100),
+        'sampling':choice('Fixed white','Fixed white','Sample at stroke start','Continuous'),
+        'limits':choice('Contiguous','Contiguous','Discontiguous'),
+        'defringe':{'default':False},
+    }),
+    'restore':Effect('Restore',restore,alpha_effect=True,context=True),
+})

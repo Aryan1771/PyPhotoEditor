@@ -20,6 +20,6 @@ def build_tool_panel(parent,app):
     for text,cmd in [('Grayscale',app.grayscale),('Gaussian Blur',app.gaussian_blur),('Median',app.median_filter),('Sobel',app.sobel_edges),('Canny',app.canny_edges),('Dither',app.dither),('K-Means',app.posterize),('Rotoscope',app.rotoscope)]:
         RoundedButton(panel,text=text,command=cmd).pack(fill='x',padx=T.PAD,pady=T.BORDER_WIDTH)
     tk.Label(panel,text='History',bg=T.BG_SIDEBAR,fg=T.TEXT_MUTED).pack(anchor='w',padx=T.PAD,pady=T.GAP)
-    app.history_list = tk.Listbox(panel,bg=T.BG_SURFACE,fg=T.TEXT,selectbackground=T.ACCENT,relief='flat',highlightthickness=0,exportselection=False)
+    app.history_list = tk.Listbox(panel,bg=T.BG_SURFACE,fg=T.TEXT,selectbackground=T.ACCENT,selectforeground=T.TEXT,relief='flat',highlightthickness=0,exportselection=False)
     app.history_list.pack(fill='both',expand=True,padx=T.PAD,pady=T.GAP)
     return tool_var

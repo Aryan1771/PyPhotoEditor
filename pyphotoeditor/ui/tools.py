@@ -1,6 +1,11 @@
 """Pointer tools delegate all pixel operations to the headless core."""
 from ..core.brush import Brush
-from ..core.stroke import StrokeSession
+from ..core.stroke import StrokeSession, union
+from ..core.bg_eraser import prepare
+from collections import deque
+import time
+from tkinter import messagebox
+from . import theme as T
 from ..core.brush_effects import EFFECTS
 from ..core import drawing, image_ops
 
@@ -21,29 +26,79 @@ class BrushTool(BaseTool):
     session = None
 
     def on_down(self,app,point):
-        if app.document.image is None:
+        if app.document.image is None or app.busy or app.drawing:
             return
-        if self.session:
-            self.session.finish()
         brush = Brush(app.brush_shape,app.brush_size,app.brush_hardness,app.brush_strength)
         key = getattr(self,'effect_key',self.engine_key)
         if key == 'restore' and not app.document.can_restore:
             app.status('Restore unavailable: canvas dimensions differ from the original.')
             return
         params = dict(app.effect_params.get(key,{}),color=app.brush_color)
-        self.session = StrokeSession(app.document,EFFECTS[key],brush,app.stroke_mode,params)
-        app.canvas_view.render_dirty(self.session.move_to(point))
+        # Keep the immutable image reference until preparation ends. Document actions
+        # are deferred by App while a stroke is being prepared or drained.
+        source = app.document.image
+        mode = app.stroke_mode
+        self.pending = deque([point])
+        self.iterator = None
+        self.released = False
+        self.session = None
+        app.drawing = True
+        def work():
+            session = StrokeSession(app.document,EFFECTS[key],brush,mode,params,source_image=source)
+            if key == 'background_eraser':
+                session.state.update(prepare(session.base,session.params,point,brush))
+            return session
+        def ready(session):
+            self.session = session
+            self._drain(app)
+        def cancel():
+            self.pending.clear()
+            self.session = None
+            app.drawing = False
+        app.runner.submit(work,'Prepare '+EFFECTS[key].name,ready,cancel,show_progress=key == 'background_eraser')
 
     def on_move(self,app,point):
-        if self.session:
-            app.canvas_view.render_dirty(self.session.move_to(point))
+        if app.drawing and not self.released and point is not None:
+            if not self.pending or self.pending[-1] != point:
+                self.pending.append(point)
 
     def on_up(self,app,point):
-        if self.session:
-            if point is not None and point != self.session.last:
-                self.session.move_to(point)
-            self.session.finish()
+        if app.drawing:
+            self.on_move(app,point)
+            self.released = True
+
+    def _drain(self,app):
+        if self.session is None:
+            return
+        started = time.perf_counter()
+        dirty = None
+        try:
+            while time.perf_counter()-started < T.STROKE_BATCH_SECONDS:
+                if self.iterator is None:
+                    if not self.pending:
+                        break
+                    self.iterator = self.session.iter_move(self.pending.popleft())
+                try:
+                    dirty = union(dirty,next(self.iterator))
+                except StopIteration:
+                    self.iterator = None
+            self.session.publish(dirty)
+            app.canvas_view.render_dirty(dirty)
+            if self.released and not self.pending and self.iterator is None:
+                box = self.session.dirty
+                self.session.finish()
+                app.canvas_view.render_dirty(union(box,self.session.dirty))
+                self.session = None
+                app.drawing = False
+                app.refresh_history()
+            else:
+                app.root.after(1,lambda:self._drain(app))
+        except Exception as exc:
+            self.session.cancel()
             self.session = None
+            app.drawing = False
+            app.canvas_view.render()
+            messagebox.showerror('Brush failed',str(exc),parent=app.root)
 
 
 class PencilTool(BrushTool):

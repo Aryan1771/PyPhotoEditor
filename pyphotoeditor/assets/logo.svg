@@ -45,6 +45,6 @@
   <!-- "Py" wordmark badge -->
   <g transform="translate(128,222)">
     <text x="0" y="0" text-anchor="middle" font-family="'Segoe UI', Helvetica, Arial, sans-serif"
-          font-size="30" font-weight="700" fill="#f2f2f2" letter-spacing="1">PyPhotoEditor</text>
+          font-size="24" font-weight="700" fill="#f2f2f2" letter-spacing="1">PyPhotoEditor</text>
   </g>
 </svg>

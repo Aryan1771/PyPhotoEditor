@@ -15,6 +15,7 @@ from tkinter import filedialog, messagebox
 from PIL import Image
 
 from ..core import Document, image_ops, filters, dithering, segmentation
+from ..core.export import save_image as export_image
 from . import menu_bar, toolbar, tool_strip, tool_panel, dialogs
 from . import theme as T
 from .canvas_view import CanvasView
@@ -34,6 +35,7 @@ class App:
 
         self.document = Document()
         self.busy = False
+        self.drawing = False
         self.runner = OperationRunner(self)
         self.brush_shape = "circle"
         self.brush_strength = 100
@@ -94,8 +96,8 @@ class App:
         self.active_tool.on_up(self, None)
         self.active_tool = self.tools[name]
         build_options(self)
-        self.tool_var.set(name.title())
-        self.status(f"Tool: {name.title()}")
+        self.tool_var.set(getattr(self.active_tool,"label",name.title()))
+        self.status(f"Tool: {self.tool_var.get()}")
         for key, button in self.tool_buttons.items():
             button.set_selected(key == name)
 
@@ -106,12 +108,15 @@ class App:
         for command in self.document.history:
             self.history_list.insert("end", command.name)
         self.history_list.selection_set(self.document.history_index)
+        if "restore" in self.tool_buttons:
+            self.tool_buttons["restore"].set_disabled(not self.document.can_restore)
 
     def _history_jump(self, event):
         selected = self.history_list.curselection()
         if selected:
             self.document.jump_to(selected[0])
             self.canvas_view.render()
+            self.tool_buttons["restore"].set_disabled(not self.document.can_restore)
 
     def toggle_panel(self):
         if self.right_panel.winfo_manager():
@@ -149,7 +154,8 @@ class App:
         if not path:
             return
         try:
-            self.document.load(Image.open(path), filepath=path)
+            with Image.open(path) as image:
+                self.document.load(image, filepath=path)
             self.refresh_history()
             self.canvas_view.fit_to_window()
             self.status(f"Opened {os.path.basename(path)}")
@@ -164,8 +170,9 @@ class App:
         try:
             img = self.document.image
             if self.document.filepath.lower().endswith((".jpg", ".jpeg")):
-                img = img.convert("RGB")
-            img.save(self.document.filepath)
+                if not messagebox.askokcancel("JPEG transparency", "JPEG cannot preserve transparency. Save flattened onto white?", parent=self.root):
+                    return
+            export_image(img, self.document.filepath)
             self.status("Saved.")
         except Exception as exc:
             messagebox.showerror("Save error", str(exc))
@@ -219,13 +226,13 @@ class App:
         self._apply(image_ops.flip_vertical)
 
     def rotate(self, degrees):
-        self._apply(lambda img: image_ops.rotate(img, degrees))
+        self._apply(lambda img: image_ops.rotate(img, degrees), f"Rotate {degrees}°")
 
     def resize_dialog(self):
         if self.document.image is None:
             return
         w, h = self.document.size
-        dialogs.ask_resize(self.root, w, h, lambda nw, nh: self._apply(lambda img: image_ops.resize(img, nw, nh)))
+        dialogs.ask_resize(self.root, w, h, lambda nw, nh: self._apply(lambda img: image_ops.resize(img, nw, nh), "Resize"))
 
     def gaussian_blur(self):
         self._apply(filters.gaussian_blur)
@@ -257,8 +264,25 @@ class App:
     def rotoscope(self):
         self._apply(segmentation.rotoscope)
 
-    def _apply(self, transform):
+    def _apply(self, transform, name=None):
         if self.document.image is None:
             return
-        name = getattr(transform, "__name__", "Image operation").replace("_", " ").title()
+        name = name or getattr(transform, "__name__", "Image operation").replace("_", " ").title()
         self.runner.start(transform, name)
+
+
+def _after_stroke(method):
+    """Serialize document commands behind any queued pointer samples."""
+    from functools import wraps
+    @wraps(method)
+    def call(self,*args,**kwargs):
+        if self.drawing:
+            self.active_tool.on_up(self,None)
+            self.root.after(T.POLL_MS,lambda:call(self,*args,**kwargs))
+            return
+        return method(self,*args,**kwargs)
+    return call
+
+
+for _method in ('select_tool','new_image','_create_new_document','open_image','save_image','save_as','undo','redo','reset','_apply','_history_jump'):
+    setattr(App,_method,_after_stroke(getattr(App,_method)))

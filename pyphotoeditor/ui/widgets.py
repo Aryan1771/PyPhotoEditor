@@ -127,7 +127,7 @@ class Slider(tk.Frame):
             self.command(value)
 
     def move(self, event):
-        value = self.low + (self.high-self.low)*max(0, min(1, event.x/T.SLIDER_WIDTH))
+        value = self.low + (self.high-self.low)*max(0, min(1, (event.x-T.SMALL)/(T.SLIDER_WIDTH-2*T.SMALL)))
         self.var.set(round(value, 2))
         if self.command:
             self.command(value)
@@ -139,7 +139,7 @@ class Slider(tk.Frame):
             return
         self.track.delete('all')
         y = T.BUTTON_HEIGHT/2
-        x = max(0, min(1, fraction))*T.SLIDER_WIDTH
+        x = T.SMALL+max(0, min(1, fraction))*(T.SLIDER_WIDTH-2*T.SMALL)
         self.track.create_line(0,y,T.SLIDER_WIDTH,y,fill=T.BORDER,width=T.SMALL)
         self.track.create_line(0,y,x,y,fill=T.ACCENT,width=T.SMALL)
         self.track.create_oval(x-T.SMALL,y-T.SMALL,x+T.SMALL,y+T.SMALL,fill=T.TEXT,outline=T.TEXT)

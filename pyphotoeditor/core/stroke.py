@@ -14,19 +14,20 @@ def union(a,b):
 
 
 class StrokeSession:
-    def __init__(self, document, effect, brush, mode='Once per stroke', params=None):
+    def __init__(self, document, effect, brush, mode='Once per stroke', params=None, source_image=None):
         if document.image is None:
             raise ValueError('A stroke requires an image')
         self.document, self.effect, self.brush, self.mode = document,effect,brush,mode
         self.params = effect.defaults() if hasattr(effect,'defaults') else {}
         self.params.update(params or {})
-        self.base = np.array(document.image,dtype=np.uint8)
+        self.base = np.array(source_image if source_image is not None else document.image,dtype=np.uint8)
         self.work = self.base.copy()
         self.coverage = np.zeros(self.base.shape[:2],dtype=np.float32)
         self.dirty = self.last = None
         self.distance = 0.0
         self.closed = False
         self.state = {}
+        self.last_stamp = None
         self.selection = document.selection
         if self.selection is not None and self.selection.shape != self.base.shape[:2]:
             raise ValueError('Selection dimensions must match document')
@@ -35,6 +36,10 @@ class StrokeSession:
         if self.closed:
             raise RuntimeError('Stroke is closed')
         x,y = map(lambda v:int(round(v)),point)
+        self.last_stamp = point
+        if self.effect.fn.__name__ == "erase_background" and "target" not in self.state:
+            from .bg_eraser import prepare
+            self.state.update(prepare(self.base,self.params,(x,y),self.brush))
         h,w = self.base.shape[:2]
         size = self.brush.size
         left,top = x-size//2,y-size//2
@@ -81,22 +86,27 @@ class StrokeSession:
         self.dirty = union(self.dirty,box)
         return box
 
-    def move_to(self, point):
+    def iter_move(self, point):
+        """Yield stamps incrementally so UI callers can bound each work batch."""
         if point is None:
-            return None
-        dirty = None
+            return
         if self.last is None:
-            dirty = self.stamp(point)
+            yield self.stamp(point)
         else:
             dx,dy = point[0]-self.last[0],point[1]-self.last[1]
             length = math.hypot(dx,dy)
             spacing = max(1,self.brush.size*self.brush.spacing)
             step = spacing-self.distance
             while step <= length:
-                dirty = union(dirty,self.stamp((self.last[0]+dx*step/length,self.last[1]+dy*step/length)))
+                yield self.stamp((self.last[0]+dx*step/length,self.last[1]+dy*step/length))
                 step += spacing
             self.distance = (self.distance+length)%spacing
         self.last = point
+
+    def move_to(self, point):
+        dirty = None
+        for box in self.iter_move(point):
+            dirty = union(dirty,box)
         self.publish(dirty)
         return dirty
 
@@ -108,7 +118,7 @@ class StrokeSession:
     def finish(self):
         if self.closed:
             return None
-        if self.last is not None:
+        if self.last is not None and self.last != self.last_stamp:
             self.publish(self.stamp(self.last))
         command = None
         if self.dirty:

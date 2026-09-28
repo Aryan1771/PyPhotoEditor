@@ -36,4 +36,4 @@ def floyd_steinberg(img: Image.Image) -> Image.Image:
                 work[y + 1, x + 1] += err * 1 / 16
 
     out = (np.clip(work, 0, 1) * 255).astype(np.uint8)
-    return Image.fromarray(out, "L").convert("RGBA")
+    return Image.fromarray(out).convert("RGBA")

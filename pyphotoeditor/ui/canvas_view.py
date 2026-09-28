@@ -41,6 +41,12 @@ class CanvasView:
         alpha = a[...,3:4].astype(np.float32)/255
         return Image.fromarray(np.rint(a[...,:3]*alpha + colors[grid]*(1-alpha)).astype(np.uint8))
 
+    def _resize_region(self, image, size, box):
+        l,t,r,b = box
+        crop = (max(0,math.floor(l)-1),max(0,math.floor(t)-1),min(image.width,math.ceil(r)+1),min(image.height,math.ceil(b)+1))
+        region = image.crop(crop)
+        return region.resize(size,Image.Resampling.BILINEAR,box=(l-crop[0],t-crop[1],r-crop[0],b-crop[1]))
+
     def render(self):
         self.widget.delete('all')
         doc = self.app.document
@@ -61,7 +67,7 @@ class CanvasView:
             self._tk_image = None
             return
         box = (l*iw/dw,t*ih/dh,r*iw/dw,b*ih/dh)
-        preview = doc.image.resize((r-l,b-t),Image.Resampling.BILINEAR,box=box)
+        preview = self._resize_region(doc.image,(r-l,b-t),box)
         self._tk_image = ImageTk.PhotoImage(self._composite(preview,l,t))
         self.widget.create_rectangle(ox-1,oy-1,ox+dw+1,oy+dh+1,outline=T.BORDER,width=T.BORDER_WIDTH)
         self.widget.create_image(ox+l,oy+t,anchor='nw',image=self._tk_image)
@@ -80,7 +86,7 @@ class CanvasView:
         b = min(vb,math.ceil(bbox[3]*dh/ih)+1)
         if r <= l or b <= t:
             return
-        preview = doc.image.resize((r-l,b-t),Image.Resampling.BILINEAR,box=(l*iw/dw,t*ih/dh,r*iw/dw,b*ih/dh))
+        preview = self._resize_region(doc.image,(r-l,b-t),(l*iw/dw,t*ih/dh,r*iw/dw,b*ih/dh))
         patch = ImageTk.PhotoImage(self._composite(preview,l,t))
         self.widget.tk.call(str(self._tk_image),'copy',str(patch),'-to',l-vl,t-vt)
 
@@ -145,7 +151,7 @@ class CanvasView:
     def _on_move(self,event):
         if self._pan:
             return self._pan_move(event)
-        if getattr(self.app,'busy',False):
+        if getattr(self.app,'busy',False) and not getattr(self.app,'drawing',False):
             return
         p = self.to_image_point(event.x,event.y)
         if p:
@@ -157,11 +163,13 @@ class CanvasView:
     def _on_up(self,event):
         if self._pan:
             return self._pan_end(event)
-        if getattr(self.app,'busy',False):
+        if getattr(self.app,'busy',False) and not getattr(self.app,'drawing',False):
             return
         p = self.to_image_point(event.x,event.y)
         self.app.active_tool.on_up(self.app,p)
         self.widget.delete('marquee')
+        if hasattr(self.app.active_tool,'session'):
+            return
         self.render()
         if hasattr(self.app,'refresh_history'):
             self.app.refresh_history()

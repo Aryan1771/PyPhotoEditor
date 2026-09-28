@@ -19,7 +19,7 @@ def grayscale(img: Image.Image) -> Image.Image:
     arr = np.asarray(img.convert("RGB"))
     gray = color.rgb2gray(arr)
     out = (gray * 255).astype(np.uint8)
-    return Image.fromarray(out, "L").convert("RGBA")
+    return Image.fromarray(out).convert("RGBA")
 
 
 @preserve_alpha

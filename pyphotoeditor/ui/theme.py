@@ -58,6 +58,11 @@ def install(root):
     for name in ('TScrollbar', 'TCombobox', 'TEntry', 'TCheckbutton', 'TSeparator'):
         style.configure(name, background=BG_SURFACE, foreground=TEXT, fieldbackground=BG_SURFACE, arrowcolor=TEXT, bordercolor=BORDER)
         style.map(name, background=[('active', BG_HOVER)], foreground=[('disabled', TEXT_FAINT)])
+    style.map('TCombobox', fieldbackground=[('readonly', BG_SURFACE)], foreground=[('readonly', TEXT)], selectbackground=[('readonly', BG_SURFACE)], selectforeground=[('readonly', TEXT)])
+    root.option_add('*TCombobox*Listbox.background', BG_SURFACE)
+    root.option_add('*TCombobox*Listbox.foreground', TEXT)
+    root.option_add('*TCombobox*Listbox.selectBackground', ACCENT)
+    root.option_add('*TCombobox*Listbox.selectForeground', TEXT)
     root.configure(bg=BG_APP)
     root.after_idle(lambda: dark_titlebar(root))
 
@@ -70,3 +75,9 @@ def dark_titlebar(root):
         ctypes.windll.dwmapi.DwmSetWindowAttribute(handle, 20, ctypes.byref(enabled), ctypes.sizeof(enabled))
     except (AttributeError, OSError, tk.TclError):
         pass
+POLL_MS = 15
+STROKE_BATCH_SECONDS = .010
+
+LOGO_SIZE = 256
+LOGO_FONT_SIZE = 26
+PARAMS_PER_ROW = 3
