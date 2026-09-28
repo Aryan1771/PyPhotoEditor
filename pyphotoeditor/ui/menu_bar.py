@@ -61,8 +61,8 @@ def build_menu_bar(root, app):
     help_m.add_command(
         label="About",
         command=lambda: messagebox.showinfo(
-            "About PyEditor",
-            "PyEditor is a Photoshop-style educational image editor built with "
+            "About PyPhotoEditor",
+            "PyPhotoEditor is a Photoshop-style educational image editor built with "
             "Python, Tkinter, Pillow, NumPy, SciPy, scikit-image and scikit-learn.",
         ),
     )

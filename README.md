@@ -1,6 +1,6 @@
-# PyEditor
+# PyPhotoEditor
 
-PyEditor is a desktop, Photoshop-style image editor written in Python, with
+PyPhotoEditor is a desktop, Photoshop-style image editor written in Python, with
 a modular architecture built for **low coupling** and **high (functional)
 cohesion**.
 
@@ -18,12 +18,12 @@ cohesion**.
 ## File structure
 
 ```
-pyeditor/
+pyphotoeditor/
 ├── requirements.txt
-├── run_pyeditor.py            # thin convenience launcher
-├── run_pyeditor.bat           # Windows double-click launcher
+├── run_pyphotoeditor.py            # thin convenience launcher
+├── run_pyphotoeditor.bat           # Windows double-click launcher
 ├── README.md
-└── pyeditor/                  # the actual package
+└── pyphotoeditor/                  # the actual package
     ├── __init__.py
     ├── main.py                 # entry point: builds Tk root, sets icon, starts App
     ├── assets/
@@ -82,20 +82,20 @@ Python 3.10+ is recommended.
 
 ```bash
 python -m pip install -r requirements.txt
-python run_pyeditor.py
+python run_pyphotoeditor.py
 ```
 
-On Windows you can also just double-click `run_pyeditor.bat`, or run:
+On Windows you can also just double-click `run_pyphotoeditor.bat`, or run:
 
 ```bash
 py -m pip install -r requirements.txt
-py run_pyeditor.py
+py run_pyphotoeditor.py
 ```
 
 You can also launch it as a package:
 
 ```bash
-python -m pyeditor.main
+python -m pyphotoeditor.main
 ```
 
 ## Included features

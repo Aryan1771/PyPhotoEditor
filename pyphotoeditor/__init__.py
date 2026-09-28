@@ -1,12 +1,12 @@
 """
-PyEditor
+PyPhotoEditor
 ========
 A Photoshop-style desktop image editor built with Tkinter (UI) and
 NumPy / SciPy / scikit-image / scikit-learn / Pillow (image processing).
 
 Package layout (see README.md for the full rationale):
 
-    pyeditor/
+    pyphotoeditor/
         core/   -> pure image-processing logic, no UI imports at all
         ui/     -> Tkinter widgets/screens, depend on core, never the reverse
         assets/ -> logo and other static resources

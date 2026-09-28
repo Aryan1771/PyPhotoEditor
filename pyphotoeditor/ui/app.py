@@ -23,7 +23,7 @@ from .tools import TOOL_CLASSES
 class App:
     def __init__(self, root: tk.Tk):
         self.root = root
-        self.root.title("PyEditor — Python Image Editor")
+        self.root.title("PyPhotoEditor — Python Image Editor")
         self.root.geometry("1400x900")
         self.root.minsize(1000, 700)
         self.root.configure(bg="#202020")
