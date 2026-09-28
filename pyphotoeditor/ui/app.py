@@ -16,6 +16,7 @@ from PIL import Image
 
 from ..core import Document, image_ops, filters, dithering, segmentation
 from . import menu_bar, toolbar, tool_strip, tool_panel, dialogs
+from . import theme as T
 from .canvas_view import CanvasView
 from .tools import TOOL_CLASSES
 
@@ -23,14 +24,15 @@ from .tools import TOOL_CLASSES
 class App:
     def __init__(self, root: tk.Tk):
         self.root = root
+        T.install(root)
         self.root.title("PyPhotoEditor — Python Image Editor")
-        self.root.geometry("1400x900")
-        self.root.minsize(1000, 700)
-        self.root.configure(bg="#202020")
+        self.root.geometry(T.WINDOW_SIZE)
+        self.root.minsize(*T.MIN_WINDOW)
+        self.root.configure(bg=T.BG_APP)
 
         self.document = Document()
-        self.brush_size = 20
-        self.brush_color = (0, 0, 0, 255)
+        self.brush_size = T.DEFAULT_BRUSH
+        self.brush_color = T.DEFAULT_COLOR
         self.tools = {name: cls() for name, cls in TOOL_CLASSES.items()}
         self.active_tool = self.tools["brush"]
 
@@ -41,21 +43,24 @@ class App:
     def _build_layout(self):
         menu_bar.build_menu_bar(self.root, self)
         self.zoom_label = toolbar.build_toolbar(self.root, self)
+        self.options = tk.Frame(self.root, bg=T.BG_APP)
+        self.options.pack(fill="x")
+        tk.Label(self.options, text="Brush options • choose a tool on the left", fg=T.TEXT_MUTED).pack(anchor="w", padx=T.PAD, pady=T.GAP)
 
-        main = tk.Frame(self.root, bg="#181818")
+        main = tk.Frame(self.root, bg=T.BG_APP)
         main.pack(fill="both", expand=True)
 
         tool_strip.build_tool_strip(main, self)
 
-        center = tk.Frame(main, bg="#111111")
+        center = tk.Frame(main, bg=T.WORKSPACE)
         center.pack(side="left", fill="both", expand=True)
         self.canvas_view = CanvasView(center, self)
 
         self.tool_var = tool_panel.build_tool_panel(main, self)
 
         self.status_var = tk.StringVar(value="Open an image to begin.")
-        tk.Label(self.root, textvariable=self.status_var, bg="#292929", fg="#bbbbbb",
-                 anchor="w", padx=10).pack(side="bottom", fill="x")
+        tk.Label(self.root, textvariable=self.status_var, bg=T.BG_SURFACE, fg=T.TEXT_MUTED,
+                 anchor="w", padx=T.PAD).pack(side="bottom", fill="x")
 
     def _bind_shortcuts(self):
         self.root.bind("<Control-o>", lambda e: self.open_image())
@@ -75,6 +80,14 @@ class App:
         self.active_tool = self.tools[name]
         self.tool_var.set(name.title())
         self.status(f"Tool: {name.title()}")
+        for key, button in self.tool_buttons.items():
+            button.set_selected(key == name)
+
+    def toggle_panel(self):
+        if self.right_panel.winfo_manager():
+            self.right_panel.pack_forget()
+        else:
+            self.right_panel.pack(side="right", fill="y")
 
     def set_brush_size(self, value):
         self.brush_size = max(1, int(float(value)))

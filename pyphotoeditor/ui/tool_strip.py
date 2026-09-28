@@ -1,34 +1,33 @@
-"""
-tool_strip
-==========
-The narrow left-hand strip of tool-selection buttons (brush, pencil,
-eraser, ...). Reads its list of tools from `tools.TOOL_CLASSES` so adding
-a new tool there automatically gives it a button here too.
-"""
-
-from __future__ import annotations
+"""Grouped, scrollable tool sidebar."""
 import tkinter as tk
-
-TOOL_ICONS = {
-    "brush": ("🖌", "Brush"),
-    "pencil": ("✏", "Pencil"),
-    "eraser": ("⌫", "Eraser"),
-    "rect": ("▣", "Rectangle"),
-    "ellipse": ("○", "Ellipse"),
-    "crop": ("⊞", "Crop"),
-    "eyedropper": ("I", "Eyedropper"),
-}
+from tkinter import ttk
+from . import theme as T
+from .widgets import IconToggleButton, Tooltip
 
 
 def build_tool_strip(parent, app):
-    strip = tk.Frame(parent, bg="#252525", width=70)
-    strip.pack(side="left", fill="y")
+    strip = tk.Frame(parent,bg=T.BG_SIDEBAR,width=T.SIDEBAR_WIDTH)
+    strip.pack(side='left',fill='y')
     strip.pack_propagate(False)
-
-    for name, (icon, tip) in TOOL_ICONS.items():
-        button = tk.Button(strip, text=icon, command=lambda n=name: app.select_tool(n),
-                            bg="#303030", fg="white", activebackground="#555",
-                            relief="flat", font=("Segoe UI Symbol", 16), width=4)
-        button.pack(pady=5, padx=6)
-        button.bind("<Enter>", lambda e, t=tip: app.status(t))
+    canvas = tk.Canvas(strip,highlightthickness=0,bg=T.BG_SIDEBAR,width=T.SIDEBAR_WIDTH)
+    scroll = ttk.Scrollbar(strip,orient='vertical',command=canvas.yview)
+    canvas.configure(yscrollcommand=scroll.set)
+    scroll.pack(side='right',fill='y')
+    canvas.pack(side='left',fill='both',expand=True)
+    content = tk.Frame(canvas,bg=T.BG_SIDEBAR)
+    canvas.create_window(0,0,window=content,anchor='nw')
+    content.bind('<Configure>',lambda e:canvas.configure(scrollregion=canvas.bbox('all')))
+    app.tool_buttons = {}
+    previous = None
+    for name, tool in app.tools.items():
+        group = 'Magic effects' if hasattr(tool,'effect_key') else 'Drawing & selection'
+        if group != previous:
+            tk.Label(content,text=group,bg=T.BG_SIDEBAR,fg=T.TEXT_MUTED,font=T.FONT_HEADING).pack(anchor='w',padx=T.GAP,pady=T.GAP)
+            previous = group
+        label = getattr(tool,'label',name.title())
+        button = IconToggleButton(content,text=label,icon=name,command=lambda n=name:app.select_tool(n))
+        button.pack(fill='x',padx=T.SMALL,pady=T.BORDER_WIDTH)
+        button.set_selected(name == 'brush')
+        Tooltip(button,label)
+        app.tool_buttons[name] = button
     return strip
