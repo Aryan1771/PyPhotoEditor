@@ -29,7 +29,7 @@ def build_menu_bar(root, app):
     file_m.add_command(label="Save", command=app.save_image, accelerator="Ctrl+S")
     file_m.add_command(label="Save As…", command=app.save_as)
     file_m.add_separator()
-    file_m.add_command(label="Exit", command=root.destroy)
+    file_m.add_command(label="Exit", command=app.close)
     cascade(label="File", menu=file_m)
 
     edit_m = tk.Menu(menu, tearoff=False)

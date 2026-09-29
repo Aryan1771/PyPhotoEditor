@@ -52,6 +52,8 @@ class Document:
         self.history_index = 0
         self.revision = 0
         self._pending = None
+        self._current_state = object()
+        self._saved_state = self._current_state
         if image is not None:
             self.load(image)
 
@@ -64,9 +66,21 @@ class Document:
         self.history_index = 0
         self._pending = None
         self.revision += 1
+        self._current_state = object()
+        self._saved_state = self._current_state
 
     def new(self, width, height, color='white'):
-        self.load(Image.new('RGBA',(max(1,width),max(1,height)),color))
+        from .image_ops import validate_dimensions
+        width,height = validate_dimensions(width,height)
+        self.load(Image.new('RGBA',(width,height),color))
+        self._saved_state = None
+
+    @property
+    def dirty(self):
+        return self.image is not None and (self._pending is not None or self._current_state is not self._saved_state)
+
+    def mark_saved(self):
+        self._saved_state = self._current_state
 
     @property
     def size(self):
@@ -82,6 +96,9 @@ class Document:
 
     def record(self, command):
         del self.history[self.history_index:]
+        command.before_state = self._current_state
+        command.after_state = object()
+        self._current_state = command.after_state
         self.history.append(command)
         self.history_index = len(self.history)
         while self.history and self.history_bytes > self.memory_budget:
@@ -106,6 +123,7 @@ class Document:
             return False
         self.history_index -= 1
         self.history[self.history_index].undo(self)
+        self._current_state = self.history[self.history_index].before_state
         self.revision += 1
         return True
 
@@ -114,6 +132,7 @@ class Document:
         if self.history_index == len(self.history):
             return False
         self.history[self.history_index].redo(self)
+        self._current_state = self.history[self.history_index].after_state
         self.history_index += 1
         self.revision += 1
         return True

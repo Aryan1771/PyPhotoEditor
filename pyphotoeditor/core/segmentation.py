@@ -30,7 +30,8 @@ def kmeans_posterize(img: Image.Image, n_clusters: int = 8, sample_cap: int = 50
     else:
         fit_sample = pixels
 
-    km = KMeans(n_clusters=min(n_clusters,len(fit_sample)), n_init=3, random_state=0)
+    cluster_count = min(n_clusters,len(np.unique(fit_sample,axis=0)))
+    km = KMeans(n_clusters=cluster_count, n_init=3, random_state=0)
     km.fit(fit_sample)
     labels = km.predict(pixels)
     out = km.cluster_centers_[labels].reshape(h, w, 3)

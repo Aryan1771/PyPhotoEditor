@@ -3,4 +3,4 @@ instead of `python -m pyphotoeditor.main`."""
 from pyphotoeditor.main import main
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

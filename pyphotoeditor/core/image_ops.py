@@ -45,10 +45,26 @@ def rotate(img: Image.Image, degrees: float) -> Image.Image:
 
 
 def resize(img: Image.Image, width: int, height: int) -> Image.Image:
-    width = max(1, int(width))
-    height = max(1, int(height))
+    width, height = validate_dimensions(width, height)
     return img.resize((width, height), Image.Resampling.LANCZOS)
 
 
 def crop(img: Image.Image, box: tuple[int, int, int, int]) -> Image.Image:
     return img.crop(box)
+
+
+MAX_DIMENSION = 32768
+MAX_PIXELS = 100_000_000
+
+
+def validate_dimensions(width, height):
+    """Reject invalid/accidentally huge allocations before touching the document."""
+    try:
+        width, height = int(str(width).strip()), int(str(height).strip())
+    except (ValueError, TypeError, OverflowError) as exc:
+        raise ValueError('Width and height must be whole numbers.') from exc
+    if not (1 <= width <= MAX_DIMENSION and 1 <= height <= MAX_DIMENSION):
+        raise ValueError(f'Width and height must be between 1 and {MAX_DIMENSION:,} pixels.')
+    if width*height > MAX_PIXELS:
+        raise ValueError('Choose dimensions of at most 100 megapixels.')
+    return width, height

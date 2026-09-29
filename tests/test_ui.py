@@ -143,3 +143,59 @@ def test_12mp_pointer_handlers_return_promptly(application):
     print('12 MP pointer handlers (ms):',[round(t*1000,2) for t in timings])
     assert max(timings) < .030
     assert len(app.document.history) == 1
+
+
+def test_open_save_failures_and_discard_cancel(application,tmp_path,monkeypatch):
+    from pyphotoeditor.ui import app as module
+    app = application
+    errors = []
+    monkeypatch.setattr(module.messagebox,'showerror',lambda *a,**kw:errors.append(a))
+    app.document.apply(lambda image:Image.new('RGBA',image.size,'red'),'Red')
+    before = app.document.image.tobytes()
+    app.document.filepath = str(tmp_path/'existing.png')
+    assert not app.open_image(str(tmp_path/'missing.png'))
+    assert app.document.image.tobytes() == before
+    target = tmp_path/'blue.png';Image.new('RGBA',(80,60),'blue').save(target)
+    monkeypatch.setattr(module.messagebox,'askyesnocancel',lambda *a,**kw:None)
+    assert not app.open_image(str(target))
+    assert app.document.image.tobytes() == before
+    monkeypatch.setattr(module,'export_image',lambda *a:(_ for _ in ()).throw(OSError('Disk full')))
+    old_path = app.document.filepath
+    monkeypatch.setattr(module.filedialog,'asksaveasfilename',lambda **kw:str(tmp_path/'new.png'))
+    assert not app.save_as()
+    assert app.document.filepath == old_path and app.document.dirty
+    assert errors
+
+
+def test_cancelled_save_does_not_allow_document_replacement(application,tmp_path,monkeypatch):
+    from pyphotoeditor.ui import app as module
+    app = application
+    app.document.apply(lambda im:Image.new('RGBA',im.size,'green'))
+    app.document.filepath = None
+    before = app.document.image.tobytes()
+    monkeypatch.setattr(module.messagebox,'askyesnocancel',lambda *a,**kw:True)
+    monkeypatch.setattr(module.filedialog,'asksaveasfilename',lambda **kw:'')
+    path = tmp_path/'open.png';Image.new('RGBA',(20,20),'blue').save(path)
+    assert not app.open_image(str(path))
+    assert app.document.image.tobytes() == before
+
+
+def test_successful_save_clears_dirty_marker(application,tmp_path):
+    app = application
+    app.document.apply(lambda im:Image.new('RGBA',im.size,'green'))
+    path = tmp_path/'saved ü image.png'
+    assert app._save_to(str(path))
+    assert not app.document.dirty
+    assert not app.root.title().startswith('*')
+    assert Image.open(path).getpixel((0,0)) == (0,128,0,255)
+
+
+def test_invalid_worker_result_is_reported_and_document_unchanged(application,monkeypatch):
+    from pyphotoeditor.ui import worker
+    app = application
+    before = app.document.image.tobytes()
+    errors = []
+    monkeypatch.setattr(worker.messagebox,'showerror',lambda *a,**kw:errors.append(a))
+    app.runner.start(lambda image:None,'Invalid plugin result')
+    settle(app)
+    assert errors and app.document.image.tobytes() == before

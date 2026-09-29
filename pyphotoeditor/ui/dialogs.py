@@ -1,56 +1,45 @@
-"""
-dialogs
-=======
-Small modal Toplevel dialogs. Each function takes the parent window and a
-callback that receives the collected values, so this module has zero
-knowledge of `Document` or `App` -- it only ever hands plain numbers back
-to whoever asked for them (loose coupling: dialogs are reusable prompts).
-"""
-
-from __future__ import annotations
+"""Validated, modal document-size dialogs."""
 import tkinter as tk
+from tkinter import messagebox
 from . import theme as T
+from .widgets import RoundedButton
+from ..core.image_ops import validate_dimensions
 
 
-def ask_new_image_size(parent, on_create):
+def _size_dialog(parent,title,width,height,on_submit,allow_lock=False):
     dialog = tk.Toplevel(parent)
-    dialog.title("New Image")
+    dialog.title(title)
     dialog.transient(parent)
     dialog.grab_set()
-
-    width_var = tk.IntVar(value=T.DEFAULT_IMAGE[0])
-    height_var = tk.IntVar(value=T.DEFAULT_IMAGE[1])
-    for label, var in [("Width", width_var), ("Height", height_var)]:
-        tk.Label(dialog, text=label).pack(anchor="w", padx=T.PAD, pady=(T.PAD, T.SMALL))
-        tk.Entry(dialog, textvariable=var).pack(padx=T.PAD)
-
-    def create():
-        on_create(width_var.get(), height_var.get())
+    width_var = tk.StringVar(value=str(width))
+    height_var = tk.StringVar(value=str(height))
+    lock = tk.BooleanVar(value=allow_lock)
+    for label,var in [('Width',width_var),('Height',height_var)]:
+        tk.Label(dialog,text=label).pack(anchor='w',padx=T.PAD,pady=(T.PAD,T.SMALL))
+        tk.Entry(dialog,textvariable=var).pack(padx=T.PAD)
+    if allow_lock:
+        tk.Checkbutton(dialog,text='Maintain aspect ratio',variable=lock).pack(pady=T.GAP)
+    def submit(event=None):
+        try:
+            raw_w,raw_h = width_var.get(),height_var.get()
+            if lock.get():
+                new_w,_ = validate_dimensions(raw_w,1)
+                raw_h = str(max(1,round(new_w*height/width)))
+            new_w,new_h = validate_dimensions(raw_w,raw_h)
+            on_submit(new_w,new_h)
+        except (ValueError,MemoryError) as exc:
+            messagebox.showerror('Invalid dimensions',str(exc),parent=dialog)
+            return
         dialog.destroy()
+    RoundedButton(dialog,text=title,command=submit).pack(padx=T.PAD,pady=T.PAD)
+    dialog.bind('<Return>',submit)
+    dialog.bind('<Escape>',lambda e:dialog.destroy())
+    return dialog
 
-    tk.Button(dialog, text="Create", command=create).pack(pady=T.PAD)
+
+def ask_new_image_size(parent,on_create):
+    return _size_dialog(parent,'New image',*T.DEFAULT_IMAGE,on_create)
 
 
-def ask_resize(parent, current_width, current_height, on_resize):
-    dialog = tk.Toplevel(parent)
-    dialog.title("Resize")
-    dialog.transient(parent)
-    dialog.grab_set()
-
-    width_var = tk.IntVar(value=current_width)
-    height_var = tk.IntVar(value=current_height)
-    lock_var = tk.BooleanVar(value=True)
-    ratio = current_height / current_width if current_width else 1.0
-
-    for label, var in [("Width", width_var), ("Height", height_var)]:
-        tk.Label(dialog, text=label).pack(anchor="w", padx=T.PAD, pady=(T.PAD, T.SMALL))
-        tk.Entry(dialog, textvariable=var).pack(padx=T.PAD)
-    tk.Checkbutton(dialog, text="Maintain aspect ratio", variable=lock_var).pack(pady=T.GAP)
-
-    def resize():
-        new_w = max(1, width_var.get())
-        new_h = max(1, int(new_w * ratio)) if lock_var.get() else max(1, height_var.get())
-        on_resize(new_w, new_h)
-        dialog.destroy()
-
-    tk.Button(dialog, text="Resize", command=resize).pack(pady=T.PAD)
+def ask_resize(parent,current_width,current_height,on_resize):
+    return _size_dialog(parent,'Resize',current_width,current_height,on_resize,allow_lock=True)

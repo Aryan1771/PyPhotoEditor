@@ -12,6 +12,8 @@ class OperationRunner:
         self.app = app
         self.cancel_event = Event()
         self.queue = Queue()
+        self.closed = False
+        self.poll_id = None
 
     def start(self,transform,name):
         app = self.app
@@ -27,7 +29,7 @@ class OperationRunner:
 
     def submit(self,work,name,on_result,on_cancel=None,show_progress=True):
         app = self.app
-        if app.busy:
+        if app.busy or self.closed:
             return False
         revision = app.document.revision
         self.cancel_event = Event()
@@ -49,7 +51,7 @@ class OperationRunner:
             except Exception as exc:
                 self.queue.put((None,str(exc)))
         Thread(target=run,daemon=True,name='image-operation').start()
-        app.root.after(T.POLL_MS,lambda:self.poll(revision,name,on_result,on_cancel))
+        self.poll_id = app.root.after(T.POLL_MS,lambda:self.poll(revision,name,on_result,on_cancel))
         return True
 
     def cancel(self):
@@ -58,11 +60,21 @@ class OperationRunner:
             self.dialog.withdraw()
         self.app.status('Cancelled; waiting for the image library to finish its current operation.')
 
+    def shutdown(self):
+        self.closed = True
+        self.cancel_event.set()
+        if self.poll_id is not None:
+            self.app.root.after_cancel(self.poll_id)
+            self.poll_id = None
+
     def poll(self,revision,name,on_result,on_cancel):
+        self.poll_id = None
+        if self.closed:
+            return
         try:
             result,error = self.queue.get_nowait()
         except Empty:
-            self.app.root.after(T.POLL_MS,lambda:self.poll(revision,name,on_result,on_cancel))
+            self.poll_id = self.app.root.after(T.POLL_MS,lambda:self.poll(revision,name,on_result,on_cancel))
             return
         if self.dialog:
             self.progress.stop()
@@ -78,4 +90,9 @@ class OperationRunner:
             else:
                 app.status('Operation cancelled; image unchanged.')
         else:
-            on_result(result)
+            try:
+                on_result(result)
+            except Exception as exc:
+                if on_cancel:
+                    on_cancel()
+                messagebox.showerror("Could not apply operation",str(exc),parent=app.root)

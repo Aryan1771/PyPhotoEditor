@@ -116,3 +116,14 @@ Core tests require no display. Tk tests run when a display can be initialized, o
 ### Practical limits
 
 Cancel is cooperative at the operation boundary: native/library work already running completes in its worker, but its result is discarded. Another worker operation waits until that work returns. Progress is indeterminate because those library APIs do not expose incremental progress. Large/high-radius brushes can take longer per stamp; long drags are split into batches, but an individual stamp cannot be interrupted. Stroke buffer preparation and connected-background analysis can add initial latency while the UI stays responsive. Smudge is a simple carried-color brush, not a fluid simulation. The optional Ctrl+K command palette is not included.
+
+
+## Standalone Windows app and installer (local build)
+
+`packaging/build.ps1` produces a windowed PyInstaller application and a single-file Inno Setup installer. The installer targets Windows 10/11 x64-compatible systems, bundles Python and codecs, installs per-user, and includes Start menu shortcuts, optional desktop/Explorer integration, and an uninstaller. It does not change default image associations. On Windows 11 the static context-menu command is normally under **Show more options**. Install Inno Setup and pass `-InnoCompiler` if `ISCC.exe` is not in the local build-tool folder. Runtime and build requirements are in `requirements-app.txt` and `requirements-build.txt`; `packaging/build-lock.txt` records the tested versions.
+
+New import support includes HEIC/HEIF, AVIF, SVG and LibRaw camera formats. SVG is rasterized; animations/multipage documents edit the first frame/page, and PSD uses its merged image. Import-only formats route to Save As PNG to preserve the original. EXIF orientation is honored. Saves are atomic; unsuccessful writes preserve the existing file and filename. Unsaved changes prompt before document replacement or closing. Invalid or excessively large dimensions produce a normal dialog instead of a callback error.
+
+The explicit `PyPhotoEditor.exe --self-test DIRECTORY` diagnostic runs format, filter, and Tk editing checks and writes `DIRECTORY/report.json`. It does not run during normal use. The installed distribution includes `SourceCode.zip`, dependency versions and available third-party licenses.
+
+Executables/build products remain outside Git history. Source and packaging work for this installer are intentionally uncommitted at the user's request.
