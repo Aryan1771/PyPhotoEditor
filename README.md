@@ -129,8 +129,45 @@ New import support includes HEIC/HEIF, AVIF, SVG and LibRaw camera formats. SVG 
 
 The explicit `PyPhotoEditor.exe --self-test DIRECTORY` diagnostic runs format, filter, and Tk editing checks and writes `DIRECTORY/report.json`. It does not run during normal use. The installed distribution includes `SourceCode.zip`, dependency versions and available third-party licenses.
 
-## Ubuntu / Debian installer
+## Ubuntu / Debian
 
 On Ubuntu 24.04+ or Debian 13+ x86-64, run `bash packaging/build-debian.sh`. The script builds and tests a self-contained PyInstaller application, then emits `PyPhotoEditor-1.1.0-Ubuntu-amd64.deb` and its SHA-256 checksum in `installers/`. Install with `sudo apt install ./PyPhotoEditor-1.1.0-Ubuntu-amd64.deb`, or open the `.deb` in the system software installer. The package provides a desktop entry and `pyphotoeditor` command. Editing works offline after installation. Debian and Ubuntu releases can differ in system library compatibility, so build the `.deb` on the oldest distribution you intend to support.
+### Linux Installation (Ubuntu/Debian)
+
+The official Linux installer is hosted right here in the repository. Because the binary is tracked via **Git LFS (Large File Storage)**, please use one of the two methods below to ensure you download the complete, working package rather than a text pointer.
+
+### Method 1: Direct Web Download (Recommended)
+1. Go directly to the [PyPhotoEditor Installers Directory](https://github.com/Aryan1771/PyPhotoEditor/tree/main/installers).
+2. Click on the `PyPhotoEditor-1.1.0-Ubuntu-amd64.deb` file.
+3. Click the **Download raw file** button (or the **Download** button in the upper right) to save the full binary to your system.
+
+### Method 2: Command Line (If Cloning the Repo)
+If you are cloning this entire repository via your terminal, you must have the `git-lfs` extension installed to fetch the actual installer binary:
+
+```bash
+# 1. Install Git LFS (if you haven't already)
+sudo apt install git-lfs
+
+# 2. Set up Git LFS in your local environment
+git lfs install
+
+# 3. Clone the repository and pull the actual LFS files
+git clone https://github.com
+cd PyPhotoEditor
+git lfs pull
+```
+
+### Installing the `.deb` Package
+Once you have downloaded the actual `PyPhotoEditor-1.1.0-Ubuntu-amd64.deb` file, open your terminal in the directory where the file is located and run:
+
+```bash
+sudo apt update
+sudo apt install ./PyPhotoEditor-1.1.0-Ubuntu-amd64.deb
+```
+
+*(Optional)* To verify that your file downloaded completely without corruption, you can cross-reference it against the provided `SHA256SUMS-Linux.txt` checksum file:
+```bash
+sha256sum -c SHA256SUMS-Linux.txt
+```
 
 Release binaries are generated locally and kept out of Git; use the source build scripts to reproduce them for Windows or Debian/Ubuntu.
