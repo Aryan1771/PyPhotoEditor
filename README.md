@@ -152,7 +152,7 @@ sudo apt install git-lfs
 git lfs install
 
 # 3. Clone the repository and pull the actual LFS files
-git clone https://github.com
+git clone https://github.com](https://github.com/Aryan1771/PyPhotoEditor/
 cd PyPhotoEditor
 git lfs pull
 ```
