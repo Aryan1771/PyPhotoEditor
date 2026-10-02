@@ -1,6 +1,6 @@
 """Shared brush controls plus registry-generated effect parameters."""
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, colorchooser
 from . import theme as T
 from .widgets import Slider, SegmentedControl
 from ..core.brush_effects import EFFECTS
@@ -11,6 +11,40 @@ def build_options(app):
         child.destroy()
     app.option_vars = []
     tool = app.active_tool
+    if app.document.selection is not None:
+        tk.Button(app.options,text='Clear active selection',command=app.clear_selection).pack(side='right',padx=T.PAD,pady=T.GAP)
+    if tool.name == 'lasso':
+        tk.Label(app.options,text='Lasso — draw a freehand outline; selection clips brush and effects.',fg=T.TEXT_MUTED).pack(anchor='w',padx=T.PAD,pady=T.GAP)
+        return
+    if tool.name == 'wand':
+        row=tk.Frame(app.options); row.pack(fill='x',padx=T.PAD,pady=T.GAP)
+        var=tk.DoubleVar(value=app.wand_tolerance)
+        Slider(row,'Color tolerance',var,1,80,lambda v:setattr(app,'wand_tolerance',v)).pack(side='left')
+        tk.Button(row,text='Clear selection',command=app.clear_selection).pack(side='left',padx=T.GAP)
+        tk.Label(app.options,text='Click a color region to select contiguous similar pixels.',fg=T.TEXT_MUTED).pack(anchor='w',padx=T.PAD)
+        return
+    if tool.name == 'foreground':
+        tk.Label(app.options,text='Select Subject — drag a foreground rectangle; local GrabCut, no downloads.',fg=T.TEXT_MUTED).pack(anchor='w',padx=T.PAD,pady=T.GAP)
+        return
+    if tool.name == 'grabcut':
+        tk.Label(app.options,text='Background Removal — box around the subject for offline GrabCut.',fg=T.TEXT_MUTED).pack(anchor='w',padx=T.PAD,pady=T.GAP)
+        return
+    if tool.name == 'symbol':
+        row=tk.Frame(app.options); row.pack(fill='x',padx=T.PAD,pady=T.GAP)
+        tk.Button(row,text='Open Symbol Studio…',command=app.symbol_studio).pack(side='left')
+        tk.Label(row,text='Click canvas to stamp; brush size controls stamp size.',fg=T.TEXT_MUTED).pack(side='left',padx=T.GAP)
+        return
+    if tool.name == 'gradient':
+        row=tk.Frame(app.options); row.pack(fill='x',padx=T.PAD,pady=T.GAP)
+        tk.Button(row,text='Start color',command=lambda:app.choose_gradient_color('start')).pack(side='left',padx=T.GAP)
+        tk.Button(row,text='End color',command=lambda:app.choose_gradient_color('end')).pack(side='left',padx=T.GAP)
+        kind=tk.StringVar(value=app.gradient_options['type']); direction=tk.StringVar(value=app.gradient_options['direction'])
+        ttk.Combobox(row,textvariable=kind,values=('linear','radial'),state='readonly',width=9).pack(side='left',padx=T.GAP)
+        ttk.Combobox(row,textvariable=direction,values=('horizontal','vertical','diagonal'),state='readonly',width=12).pack(side='left')
+        kind.trace_add('write',lambda *_:app.gradient_options.__setitem__('type',kind.get()))
+        direction.trace_add('write',lambda *_:app.gradient_options.__setitem__('direction',direction.get()))
+        tk.Label(app.options,text='Drag across the canvas to fill the box; active selection clips the gradient.',fg=T.TEXT_MUTED).pack(anchor='w',padx=T.PAD)
+        return
     if not hasattr(tool,'engine_key'):
         tk.Label(app.options,text=tool.name.title()+' — drag a box, or click to sample',fg=T.TEXT_MUTED).pack(anchor='w',padx=T.PAD,pady=T.GAP)
         return

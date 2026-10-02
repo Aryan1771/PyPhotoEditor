@@ -3,3 +3,4 @@ Pillow
 scipy
 scikit-image
 scikit-learn
+opencv-python-headless

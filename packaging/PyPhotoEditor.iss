@@ -1,5 +1,5 @@
 #define AppName "PyPhotoEditor"
-#define AppVersion "1.0.0"
+#define AppVersion "1.1.0"
 #define ProjectRoot AddBackslash(SourcePath) + ".."
 
 [Setup]
@@ -17,7 +17,7 @@ ArchitecturesInstallIn64BitMode=x64compatible
 UsePreviousTasks=no
 MinVersion=10.0
 OutputDir={#ProjectRoot}\work\packaging\installer
-OutputBaseFilename=PyPhotoEditor-1.0.0-Windows-x64-Setup
+OutputBaseFilename=PyPhotoEditor-1.1.0-Windows-x64-Setup
 SetupIconFile={#ProjectRoot}\work\packaging\app.ico
 UninstallDisplayIcon={app}\PyPhotoEditor.exe
 UninstallDisplayName=PyPhotoEditor

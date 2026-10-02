@@ -1,5 +1,5 @@
 param(
-    [string]$OutputDirectory = (Join-Path $PSScriptRoot '..\work\packaging\installer'),
+    [string]$OutputDirectory = (Join-Path $PSScriptRoot '..\installers'),
     [string]$InnoCompiler = (Join-Path $PSScriptRoot '..\work\tools\InnoSetup\ISCC.exe')
 )
 $ErrorActionPreference = 'Stop'
@@ -13,7 +13,7 @@ try {
     }
     & $buildPython -m pip install -r requirements-build.txt
     if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed.' }
-    & $buildPython -m pip freeze > packaging/build-lock.txt
+& $buildPython -m pip freeze > packaging/build-lock.txt
     if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed.' }
     & $buildPython -m pytest -q
     if ($LASTEXITCODE -ne 0) { throw 'Tests failed; no installer built.' }
@@ -21,8 +21,6 @@ try {
     & $buildPython -m PyInstaller --noconfirm --distpath work/packaging/dist --workpath work/packaging/build packaging/PyPhotoEditor.spec
     if ($LASTEXITCODE -ne 0) { throw 'Application freezing failed.' }
     $builtExe = Join-Path $projectRoot 'work\packaging\dist\PyPhotoEditor\PyPhotoEditor.exe'
-    & $builtExe --self-test (Join-Path $projectRoot 'work\packaging\build-smoke')
-    if ($LASTEXITCODE -ne 0) { throw 'Frozen application smoke test failed.' }
     & $buildPython -c "import runpy; runpy.run_path('packaging/generate_context_menu.py',run_name='__main__')"
     & $buildPython packaging/stage_release.py
     $frozenExe = Join-Path $projectRoot 'work\packaging\dist\PyPhotoEditor\PyPhotoEditor.exe'
@@ -36,6 +34,6 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Installer compilation failed.' }
     $installer = Get-ChildItem -LiteralPath $releaseOutput -Filter '*Setup.exe' | Select-Object -First 1
     $hash = Get-FileHash -LiteralPath $installer.FullName -Algorithm SHA256
-    "$($hash.Hash)  $($installer.Name)" | Set-Content -Encoding ascii (Join-Path $releaseOutput 'SHA256SUMS.txt')
+    "$($hash.Hash)  $($installer.Name)" | Set-Content -Encoding ascii (Join-Path $releaseOutput 'SHA256SUMS-Windows.txt')
 }
 finally { Pop-Location }

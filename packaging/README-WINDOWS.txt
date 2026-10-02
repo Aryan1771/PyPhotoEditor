@@ -1,6 +1,6 @@
-PYPHOTOEDITOR 1.0.0 — WINDOWS APP
+PYPHOTOEDITOR 1.1.0 — WINDOWS APP
 
-Run PyPhotoEditor.exe, or install with PyPhotoEditor-1.0.0-Windows-x64-Setup.exe.
+Run PyPhotoEditor.exe, or install with PyPhotoEditor-1.1.0-Windows-x64-Setup.exe.
 Python and all image libraries are included. Installation and editing work offline.
 
 Requirements: Windows 10 or Windows 11, 64-bit Intel/AMD. Windows 11 ARM64 can
@@ -23,6 +23,11 @@ OPEN AND EDIT
 - Failed saves leave existing files intact. Unsaved changes prompt before
   closing, creating a new document, or opening another image.
 - Cancel in a long-running filter discards its result after the library returns.
+- Use Lasso or Magic Wand to select image regions. Select Subject and Background
+  Removal use local GrabCut without downloading a model or contacting a service.
+- Gradient adds linear or radial fills. Symbol Studio creates pixel art, freehand
+  artwork, or stamps from local images. Tool options are in a collapsible drawer
+  at the bottom of the editor.
 
 SHARING
 Share the single Setup.exe; friends do not need this source repository or Python.

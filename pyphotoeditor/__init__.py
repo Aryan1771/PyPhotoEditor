@@ -12,4 +12,4 @@ Package layout (see README.md for the full rationale):
         assets/ -> logo and other static resources
 """
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"

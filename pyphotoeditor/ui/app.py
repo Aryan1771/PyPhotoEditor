@@ -46,6 +46,12 @@ class App:
         self.effect_params = {}
         self.brush_size = T.DEFAULT_BRUSH
         self.brush_color = T.DEFAULT_COLOR
+        self.gradient_start = (0, 0, 0, 255)
+        self.gradient_end = (16, 163, 127, 255)
+        self.gradient_options = {'type':'linear','direction':'horizontal'}
+        self.wand_tolerance = 24
+        self.active_symbol = None
+        self.document.selection = None
         self.tools = {name: cls() for name, cls in TOOL_CLASSES.items()}
         self.active_tool = self.tools["brush"]
 
@@ -60,9 +66,10 @@ class App:
     def _build_layout(self):
         menu_bar.build_menu_bar(self.root, self)
         self.zoom_label = toolbar.build_toolbar(self.root, self)
-        self.options = tk.Frame(self.root, bg=T.BG_APP)
-        self.options.pack(fill="x")
-        tk.Label(self.options, text="Brush options • choose a tool on the left", fg=T.TEXT_MUTED).pack(anchor="w", padx=T.PAD, pady=T.GAP)
+        self.bottom_options=tk.Frame(self.root,bg=T.BG_SIDEBAR,highlightbackground=T.BORDER,highlightthickness=1)
+        self.options = tk.Frame(self.bottom_options, bg=T.BG_APP)
+        self.options.pack(fill='x',padx=T.GAP,pady=T.SMALL)
+        self.options_open=True
 
         main = tk.Frame(self.root, bg=T.BG_APP)
         main.pack(fill="both", expand=True)
@@ -76,8 +83,10 @@ class App:
         self.tool_var = tool_panel.build_tool_panel(main, self)
 
         self.status_var = tk.StringVar(value="Open an image to begin.")
-        tk.Label(self.root, textvariable=self.status_var, bg=T.BG_SURFACE, fg=T.TEXT_MUTED,
-                 anchor="w", padx=T.PAD).pack(side="bottom", fill="x")
+        self.status_var_widget=tk.Label(self.root, textvariable=self.status_var, bg=T.BG_SURFACE, fg=T.TEXT_MUTED,
+                 anchor="w", padx=T.PAD)
+        self.status_var_widget.pack(side="bottom", fill="x")
+        self.bottom_options.pack(side='bottom',fill='x',before=self.status_var_widget)
 
     def _bind_shortcuts(self):
         self.root.bind("<Control-o>", lambda e: self.open_image())
@@ -150,6 +159,16 @@ class App:
         else:
             self.right_panel.pack(side="right", fill="y")
 
+    def toggle_tool_options(self):
+        if self.options_open:
+            self.options.pack_forget()
+            self.options_open=False
+            self.tool_options_toggle.text='Tool settings  ▾'; self.tool_options_toggle.draw()
+        else:
+            self.options.pack(fill='x',padx=T.GAP,pady=T.SMALL)
+            self.options_open=True
+            self.tool_options_toggle.text='Tool settings  ▴'; self.tool_options_toggle.draw()
+
     def adjust_size(self, delta):
         if self.root.focus_get() and self.root.focus_get().winfo_class() in ("Entry", "TEntry"):
             return
@@ -162,6 +181,79 @@ class App:
 
     def set_brush_color(self, rgba):
         self.brush_color = rgba
+
+    def clear_selection(self):
+        self.document.selection=None
+        self.canvas_view.render()
+        self.status('Selection cleared.')
+
+    def symbol_studio(self):
+        """Open an offline pixel/brush/local-symbol creation workspace."""
+        from tkinter import colorchooser
+        from tkinter import filedialog, ttk
+        from PIL import Image,ImageDraw,ImageTk
+        win=tk.Toplevel(self.root); win.title('Symbol Studio'); win.transient(self.root); win.geometry('720x570')
+        tabs=ttk.Notebook(win); tabs.pack(fill='both',expand=True,padx=T.PAD,pady=T.PAD)
+        pixel_tab=tk.Frame(tabs); brush_tab=tk.Frame(tabs); local_tab=tk.Frame(tabs)
+        tabs.add(pixel_tab,text='Pixel art'); tabs.add(brush_tab,text='Paint'); tabs.add(local_tab,text='PC images')
+        color=tk.StringVar(value='#10a37f'); grid=tk.IntVar(value=24); pixel_size=10
+        preview=tk.Canvas(pixel_tab,width=240,height=240,bg='#eeeeee',highlightthickness=0); preview.pack(padx=T.PAD,pady=T.PAD)
+        tk.Label(pixel_tab,text='Paint individual cells, then use the result as a stamp.',fg=T.TEXT_MUTED).pack()
+        control=tk.Frame(pixel_tab); control.pack(pady=T.GAP)
+        ttk.Spinbox(control,from_=8,to=48,textvariable=grid,width=5).pack(side='left',padx=T.GAP)
+        tk.Entry(control,textvariable=color,width=10).pack(side='left')
+        tk.Button(control,text='Color…',command=lambda:color.set(colorchooser.askcolor(parent=win)[1] or color.get())).pack(side='left',padx=T.GAP)
+        symbols=[None]
+        def new_grid():
+            size=int(grid.get()); symbols[0]=Image.new('RGBA',(size,size),(0,0,0,0)); preview.delete('all')
+            preview.create_rectangle(0,0,240,240,fill='white',outline='')
+            for i in range(size+1):
+                p=i*240/size; preview.create_line(p,0,p,240,fill='#cccccc'); preview.create_line(0,p,240,p,fill='#cccccc')
+            preview.bind('<Button-1>',paint_cell); preview.bind('<B1-Motion>',paint_cell)
+        def paint_cell(event):
+            size=symbols[0].width; x=min(size-1,max(0,int(event.x/240*size))); y=min(size-1,max(0,int(event.y/240*size)))
+            try: fill=color.get()
+            except Exception: return
+            ImageDraw.Draw(symbols[0]).rectangle((x,y,x,y),fill=fill)
+            step=240/size; preview.create_rectangle(x*step,y*step,(x+1)*step,(y+1)*step,fill=fill,outline='#cccccc')
+        def use_symbol(image): self.active_symbol=image.convert('RGBA'); self.brush_size=max(1,min(500,max(image.size))); self.select_tool('symbol'); win.destroy()
+        ttk.Button(control,text='New grid',command=new_grid).pack(side='left',padx=T.GAP)
+        ttk.Button(control,text='Use as stamp',command=lambda:use_symbol(symbols[0]) if symbols[0] else None).pack(side='left')
+        new_grid()
+        brush_canvas=tk.Canvas(brush_tab,width=480,height=300,bg='white'); brush_canvas.pack(padx=T.PAD,pady=T.PAD)
+        tk.Label(brush_tab,text='Draw freely, choose a brush color and size, then use your drawing as a stamp.',fg=T.TEXT_MUTED).pack()
+        brush_image=Image.new('RGBA',(480,300),(0,0,0,0)); draw_state=[None]; art_color=[self.brush_color]
+        brush_controls=tk.Frame(brush_tab); brush_controls.pack(pady=T.GAP)
+        ttk.Button(brush_controls,text='Brush color…',command=lambda:self._choose_symbol_brush_color(colorchooser,art_color)).pack(side='left',padx=T.GAP)
+        brush_width=tk.IntVar(value=max(2,self.brush_size//3))
+        ttk.Label(brush_controls,text='Brush size').pack(side='left')
+        ttk.Scale(brush_controls,from_=2,to=60,variable=brush_width,orient='horizontal').pack(side='left',padx=T.GAP)
+        def start(event): draw_state[0]=(event.x,event.y); brush_canvas.bind('<B1-Motion>',paint_brush)
+        def paint_brush(event):
+            x,y=draw_state[0]; fill=tuple(art_color[0]); width=max(2,int(brush_width.get())); ImageDraw.Draw(brush_image).line((x,y,event.x,event.y),fill=fill,width=width); brush_canvas.create_line(x,y,event.x,event.y,fill='#'+''.join(f'{v:02x}' for v in fill[:3]),width=width,capstyle='round'); draw_state[0]=(event.x,event.y)
+        brush_canvas.bind('<Button-1>',start)
+        ttk.Button(brush_tab,text='Use as stamp',command=lambda:use_symbol(brush_image)).pack(pady=T.GAP)
+        tk.Label(local_tab,text='Load a transparent or ordinary image from this PC; it stays on your computer.',fg=T.TEXT_MUTED).pack(pady=T.PAD)
+        local_preview=tk.Label(local_tab); local_preview.pack(expand=True)
+        chosen=[None]
+        def load_symbol():
+            path=filedialog.askopenfilename(parent=win,filetypes=[('Images','*.png *.webp *.bmp *.gif *.tif *.tiff *.jpg *.jpeg'),('All files','*.*')])
+            if not path:return
+            try:
+                image=Image.open(path).convert('RGBA'); image.thumbnail((360,300)); chosen[0]=image
+                thumb=image.copy(); thumb.thumbnail((240,200)); self._symbol_preview=ImageTk.PhotoImage(thumb,master=win); local_preview.configure(image=self._symbol_preview)
+            except Exception as exc: messagebox.showerror('Symbol error',str(exc),parent=win)
+        ttk.Button(local_tab,text='Choose image…',command=load_symbol).pack(pady=T.GAP)
+        ttk.Button(local_tab,text='Use as stamp',command=lambda:use_symbol(chosen[0]) if chosen[0] else None).pack()
+
+    def _choose_symbol_brush_color(self,colorchooser,target):
+        result=colorchooser.askcolor(parent=self.root,color='#'+''.join(f'{v:02x}' for v in self.brush_color[:3]))
+        if result[0]: target[0]=(*map(int,result[0]),255)
+
+    def choose_gradient_color(self,which):
+        from tkinter import colorchooser
+        result=colorchooser.askcolor(parent=self.root)
+        if result[0]: setattr(self,'gradient_'+which,(*map(int,result[0]),255))
 
     # ---- document lifecycle -------------------------------------------
     def new_image(self):
@@ -334,5 +426,5 @@ def _after_stroke(method):
     return call
 
 
-for _method in ('close','select_tool','new_image','_create_new_document','open_image','save_image','save_as','undo','redo','reset','_apply','_history_jump'):
+for _method in ('close','select_tool','new_image','_create_new_document','open_image','save_image','save_as','undo','redo','reset','_apply','_history_jump','clear_selection'):
     setattr(App,_method,_after_stroke(getattr(App,_method)))

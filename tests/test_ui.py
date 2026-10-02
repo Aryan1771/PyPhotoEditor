@@ -130,6 +130,21 @@ def test_all_registered_tool_controls_build(application):
         assert app.active_tool.name == name
 
 
+def test_bottom_tool_drawer_collapses_without_hiding_editor(application):
+    app=application
+    app.root.update()
+    assert app.bottom_options.winfo_manager()
+    assert app.options.winfo_manager()
+    app.toggle_tool_options()
+    app.root.update()
+    assert not app.options.winfo_manager()
+    assert app.bottom_options.winfo_manager()
+    app.toggle_tool_options()
+    app.root.update()
+    assert app.options.winfo_manager()
+    assert app.canvas_view.widget.winfo_ismapped()
+
+
 @pytest.mark.slow
 def test_12mp_pointer_handlers_return_promptly(application):
     app = application

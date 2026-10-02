@@ -49,6 +49,7 @@ class CanvasView:
 
     def render(self):
         self.widget.delete('all')
+        self._selection_image = None
         doc = self.app.document
         cw,ch = self._canvas_size()
         if doc.image is None:
@@ -71,6 +72,7 @@ class CanvasView:
         self._tk_image = ImageTk.PhotoImage(self._composite(preview,l,t))
         self.widget.create_rectangle(ox-1,oy-1,ox+dw+1,oy+dh+1,outline=T.BORDER,width=T.BORDER_WIDTH)
         self.widget.create_image(ox+l,oy+t,anchor='nw',image=self._tk_image)
+        self.draw_active_selection()
         self.app.on_zoom_changed(dw/iw)
 
     def render_dirty(self, bbox):
@@ -95,6 +97,38 @@ class CanvasView:
         ox,oy = self.image_origin
         sx,sy = self.display_size[0]/self.app.document.size[0],self.display_size[1]/self.app.document.size[1]
         self.widget.create_rectangle(ox+box[0]*sx,oy+box[1]*sy,ox+box[2]*sx,oy+box[3]*sy,outline=T.TEXT,dash=T.MARQUEE_DASH,width=T.BORDER_WIDTH,tags='marquee')
+
+    def draw_selection(self, points, closed=True):
+        self.widget.delete('selection-preview')
+        if not points: return
+        ox,oy=self.image_origin
+        sx,sy=self.display_size[0]/self.app.document.size[0],self.display_size[1]/self.app.document.size[1]
+        coords=[v for x,y in points for v in (ox+x*sx,oy+y*sy)]
+        if len(coords)>=4:
+            self.widget.create_line(*coords,fill='#55d6be',dash=(4,3),width=2,tags='selection-preview')
+            if closed: self.widget.create_line(coords[-2],coords[-1],coords[0],coords[1],fill='#55d6be',dash=(4,3),width=2,tags='selection-preview')
+
+    def draw_active_selection(self):
+        self.widget.delete('selection-outline')
+        selection=self.app.document.selection
+        if selection is None:return
+        from PIL import Image,ImageFilter
+        mask=Image.fromarray((selection>0.5).astype(np.uint8)*255)
+        # Marching ants follow a reduced-resolution boundary for large images.
+        scale=min(1.0,640/max(mask.size))
+        if scale<1: mask=mask.resize((max(1,int(mask.width*scale)),max(1,int(mask.height*scale))),Image.Resampling.NEAREST)
+        edge=mask.filter(ImageFilter.FIND_EDGES).point(lambda x:255 if x>0 else 0)
+        vl,vt,vr,vb=self.viewport
+        if vr<=vl or vb<=vt:return
+        sw,sh=self.display_size
+        src=(max(0,int(vl/ sw*edge.width)),max(0,int(vt/sh*edge.height)),
+             min(edge.width,int(np.ceil(vr/sw*edge.width))),min(edge.height,int(np.ceil(vb/sh*edge.height))))
+        if src[2]<=src[0] or src[3]<=src[1]:return
+        patch=edge.crop(src).resize((vr-vl,vb-vt),Image.Resampling.NEAREST)
+        rgba=Image.new('RGBA',patch.size,(85,214,190,0)); rgba.putalpha(patch)
+        self._selection_image=ImageTk.PhotoImage(rgba,master=self.widget)
+        ox,oy=self.image_origin
+        self.widget.create_image(ox+vl,oy+vt,anchor='nw',image=self._selection_image,tags='selection-outline')
 
     def fit_to_window(self):
         self.zoom = 1.0

@@ -25,7 +25,9 @@ def build_tool_strip(parent, app):
     app.tool_buttons = {}
     previous = None
     for name, tool in app.tools.items():
-        group = 'Magic effects' if hasattr(tool,'effect_key') else 'Drawing & selection'
+        group = ('Magic effects' if hasattr(tool,'effect_key') else
+                 'Selection & masking' if name in ('lasso','wand','foreground','grabcut') else
+                 'Creative tools' if name in ('gradient','symbol') else 'Drawing & selection')
         if group != previous:
             tk.Label(content,text=group,bg=T.BG_SIDEBAR,fg=T.TEXT_MUTED,font=T.FONT_HEADING).pack(anchor='w',padx=T.GAP,pady=T.GAP)
             previous = group
