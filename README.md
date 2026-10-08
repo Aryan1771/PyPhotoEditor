@@ -68,7 +68,7 @@ PyPhotoEditor/
         └── menu_bar.py / toolbar.py / tool_strip.py / tool_panel.py / dialogs.py
 ```
 
-**Library choices:** scikit-image handles color spaces and edge processing, SciPy handles neighborhood filters and connected components, and NumPy vectorizes masks/blending/dithering. Pillow handles image I/O, drawing and display conversion. scikit-learn retains K-Means. The prompt's library restriction was removed; no additional runtime dependency was needed to meet the measured brush timings. OpenCV can be added for a future effect without an architectural change.
+**Library choices:** scikit-image handles color spaces and edge processing, SciPy handles neighborhood filters and connected components, and NumPy vectorizes masks/blending/dithering. Pillow handles image I/O, drawing and display conversion. scikit-learn retains K-Means. OpenCV provides the GrabCut-based selection and background-removal tools.
 
 ### Stroke and history contracts
 
@@ -78,7 +78,7 @@ The UI prepares buffers in a worker, then processes interpolated stamps in short
 
 Each changed stroke records one `PatchCommand(bbox, before, after, name)`. Whole-image operations record `SnapshotCommand`. `Document.apply(transform, name=None)` remains compatible with existing Image→Image functions. Undo/redo restore bytes exactly. The default history budget is **512 MiB**, configurable as `Document(memory_budget=...)`; oldest commands are evicted. A single command larger than the budget is not retained. The budget covers retained commands, not the original image, current image or active stroke buffers. The first History row is the earliest retained state after eviction.
 
-### Add an effect in under 10 lines
+### Add a brush effect
 
 Add this entry to `core/brush_effects.py`; the sidebar and parameter controls discover it automatically on startup:
 
@@ -136,12 +136,12 @@ On Ubuntu 24.04+ or Debian 13+ x86-64, run `bash packaging/build-debian.sh`. The
 
 The official Linux installer is hosted right here in the repository. Because the binary is tracked via **Git LFS (Large File Storage)**, please use one of the two methods below to ensure you download the complete, working package rather than a text pointer.
 
-### Method 1: Direct Web Download (Recommended)
+### Download the packaged installer
 1. Go directly to the [PyPhotoEditor Installers Directory](https://github.com/Aryan1771/PyPhotoEditor/tree/main/installers).
 2. Click on the `PyPhotoEditor-1.1.0-Ubuntu-amd64.deb` file.
 3. Click the **Download raw file** button (or the **Download** button in the upper right) to save the full binary to your system.
 
-### Method 2: Command Line (If Cloning the Repo)
+### Clone with Git LFS
 If you are cloning this entire repository via your terminal, you must have the `git-lfs` extension installed to fetch the actual installer binary:
 
 ```bash
@@ -152,7 +152,7 @@ sudo apt install git-lfs
 git lfs install
 
 # 3. Clone the repository and pull the actual LFS files
-git clone https://github.com](https://github.com/Aryan1771/PyPhotoEditor/
+git clone https://github.com/Aryan1771/PyPhotoEditor.git
 cd PyPhotoEditor
 git lfs pull
 ```
@@ -170,4 +170,8 @@ sudo apt install ./PyPhotoEditor-1.1.0-Ubuntu-amd64.deb
 sha256sum -c SHA256SUMS-Linux.txt
 ```
 
-Release binaries are generated locally and kept out of Git; use the source build scripts to reproduce them for Windows or Debian/Ubuntu.
+The repository includes a Linux installer tracked through Git LFS. Use the source build scripts to reproduce packages for Windows or Debian/Ubuntu.
+
+## License
+
+See [LICENSE](LICENSE) for the GNU GPL v3 terms.
